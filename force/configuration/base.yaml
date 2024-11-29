@@ -1,0 +1,9 @@
+application:
+  port: 80
+
+database:
+  port: 5432
+  username: "postgres"
+  password: "password"
+  database_name: "raabta"
+  require_ssl: false
