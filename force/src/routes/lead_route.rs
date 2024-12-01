@@ -2,14 +2,17 @@ use actix_web::{get, web, HttpResponse};
 use serde::Deserialize;
 use sqlx::PgPool;
 
+use crate::services::OpenaiClient;
+
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
     niche: String,
     requester_email: String,
 }
 
-#[get("/")]
+#[get("")]
 async fn get_leads_from_niche(
+    openai_client: web::Data<OpenaiClient>,
     body: web::Query<GetLeadsFromNicheQuery>,
     pool: web::Data<PgPool>,
 ) -> HttpResponse {
@@ -22,5 +25,14 @@ async fn get_leads_from_niche(
     5. Verify emails from API
     6. Return verified leads (emails)
     */
+    let result = openai_client
+        .get_boolean_searches_from_niche(&body.niche)
+        .await;
+
+    match result {
+        Ok(()) => {}
+        Err(e) => log::error!("{}", e),
+    }
+
     todo!()
 }

@@ -1,7 +1,7 @@
 use std::net::TcpListener;
 
 use env_logger::Env;
-use force::{configuration::get_configuration, startup::run};
+use force::{configuration::get_configuration, services::OpenaiClient, startup::run};
 use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
@@ -15,6 +15,7 @@ async fn main() -> std::io::Result<()> {
         configuration.application.host, configuration.application.port
     );
     let listener = TcpListener::bind(address)?;
+    let openai_client = OpenaiClient::default();
 
-    run(listener, connection_pool)?.await
+    run(listener, connection_pool, openai_client)?.await
 }
