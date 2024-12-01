@@ -1,3 +1,6 @@
+api_keys:
+  openai: "prod_key"
+
 application:
   host: 0.0.0.0
 

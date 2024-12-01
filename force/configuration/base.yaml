@@ -1,3 +1,6 @@
+api_keys:
+  openai: "base_key"
+
 application:
   port: 80
 

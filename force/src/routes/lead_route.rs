@@ -14,7 +14,7 @@ async fn get_leads_from_niche(
     pool: web::Data<PgPool>,
 ) -> HttpResponse {
     /*
-    1. User verification and free tier count
+    1. (v2) User verification and free tier count
     2. Get boolean search list from open api using the niche prompt
     3. Perform web scraping on each boolean search page, store results in db
         3.1 Rotate ips if getting blocked from google

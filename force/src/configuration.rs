@@ -5,6 +5,7 @@ use sqlx::postgres::{PgConnectOptions, PgSslMode};
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub api_keys: ApiKeys,
 }
 
 #[derive(serde::Deserialize)]
@@ -23,6 +24,11 @@ pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ApiKeys {
+    pub openai: String,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
