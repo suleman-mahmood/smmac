@@ -8,7 +8,7 @@ use actix_web::{
 };
 use sqlx::PgPool;
 
-use crate::routes::default_route;
+use crate::routes::{default_route, lead_route};
 
 pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
@@ -16,10 +16,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
         App::new()
             .wrap(Logger::default())
             .service(default_route::default)
-            // .service(
-            //     web::scope("/dashboard")
-            //         .service(dashboard_route::dashboard)
-            // )
+            .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
             .app_data(db_pool.clone())
     })
     .listen(listener)?
