@@ -15,7 +15,10 @@ impl Default for OpenaiClient {
 }
 
 impl OpenaiClient {
-    pub async fn get_boolean_searches_from_niche(&self, niche: &str) -> Result<(), Box<dyn Error>> {
+    pub async fn get_boolean_searches_from_niche(
+        &self,
+        niche: &str,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
         let request = CreateCompletionRequestArgs::default()
             .model("gpt-3.5-turbo-instruct")
             .prompt(
@@ -34,10 +37,16 @@ impl OpenaiClient {
 
         let response = self.client.completions().create(request).await?;
         log::info!("Response: {:?}", response);
-        for choice in response.choices {
-            log::info!("{}", choice.text);
-        }
 
-        Ok(())
+        let first_choice = response
+            .choices
+            .first()
+            .ok_or("No choices in Openai response")?
+            .text
+            .clone();
+
+        let searches: Vec<String> = first_choice.split("\n").map(|s| s.to_string()).collect();
+
+        Ok(searches)
     }
 }
