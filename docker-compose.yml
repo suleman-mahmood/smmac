@@ -6,7 +6,8 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entryPoints.websecure.address=:443"
       - "--entryPoints.web.address=:80"
-      - "--entryPoints.pg.address=:5432"
+      - "--entryPoints.pg1.address=:5432"
+      - "--entryPoints.pg2.address=:5433"
       - "--entryPoints.web.http.redirections.entrypoint.to=websecure"
       - "--entryPoints.web.http.redirections.entrypoint.scheme=https"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
@@ -17,6 +18,7 @@ services:
       - "80:80"
       - "443:443"
       - "5432:5432"
+      - "5433:5433"
     volumes:
       - letsencrypt:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock
@@ -46,7 +48,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.tcp.routers.raabta_postgres.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.raabta_postgres.entrypoints=pg"
+      - "traefik.tcp.routers.raabta_postgres.entrypoints=pg1"
       - "traefik.tcp.services.raabta_postgres.loadbalancer.server.port=5432"
     depends_on:
       - reverse-proxy
@@ -71,15 +73,17 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: smmac
+      POSTGRES_PORT: 5433
     volumes:
       - smmac_pg_data:/var/lib/postgresql/data
     labels:
       - "traefik.enable=true"
       - "traefik.tcp.routers.smmac_postgres.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.smmac_postgres.entrypoints=pg"
-      - "traefik.tcp.services.smmac_postgres.loadbalancer.server.port=5432"
+      - "traefik.tcp.routers.smmac_postgres.entrypoints=pg2"
+      - "traefik.tcp.services.smmac_postgres.loadbalancer.server.port=5433"
     depends_on:
       - reverse-proxy
+    command: -p 5433
 
   chrome:
     image: selenium/standalone-chrome:latest
