@@ -231,7 +231,7 @@ async fn get_urls_from_google_searches(search_terms: Vec<String>) -> Result<Vec<
 
         let a_tag = driver
             .find(By::XPath(
-                "/html/body/div[3]/div/div[13]/div/div[2]/div[2]/div/div/div/div/div/div/div[1]/div/div/span/a",
+                "/a", // "/html/body/div[3]/div/div[13]/div/div[2]/div[2]/div/div/div/div/div/div/div[1]/div/div/span/a",
             ))
             .await;
         if let Err(e) = a_tag {
@@ -241,7 +241,7 @@ async fn get_urls_from_google_searches(search_terms: Vec<String>) -> Result<Vec<
 
         let a_tags = driver
             .find_all(By::XPath(
-                "/html/body/div[3]/div/div[13]/div/div[2]/div[2]/div/div/div/div/div/div/div[1]/div/div/span/a",
+                "/a", // "/html/body/div[3]/div/div[13]/div/div[2]/div[2]/div/div/div/div/div/div/div[1]/div/div/span/a",
             ))
             .await
             .unwrap();
