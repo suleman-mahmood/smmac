@@ -73,7 +73,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: smmac
-      POSTGRES_PORT: 5433
     volumes:
       - smmac_pg_data:/var/lib/postgresql/data
     labels:
