@@ -219,32 +219,26 @@ async fn get_urls_from_google_searches(search_terms: Vec<String>) -> Result<Vec<
         .collect();
 
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:54610", caps)
+
+    // http://chrome:4444/wd/hub
+    // http://localhost:58656
+    let driver = WebDriver::new("http://chrome:4444/wd/hub", caps)
         .await
-        .map_err(|e| e.to_string())?;
-    driver.maximize_window().await.map_err(|e| e.to_string())?;
+        .unwrap();
+    driver.maximize_window().await.unwrap();
 
     let mut urls: Vec<String> = vec![];
 
     for url in search_urls.iter() {
-        driver.goto(url).await.map_err(|e| e.to_string())?;
+        driver.goto(url).await.unwrap();
 
-        let a_tag = driver
-            .find(By::XPath(
-                "/a", // "/html/body/div[3]/div/div[13]/div/div[2]/div[2]/div/div/div/div/div/div/div[1]/div/div/span/a",
-            ))
-            .await;
+        let a_tag = driver.find(By::XPath("//a")).await;
         if let Err(e) = a_tag {
             log::error!("Couldn't find a_tag: {}", e);
             continue;
         }
 
-        let a_tags = driver
-            .find_all(By::XPath(
-                "/a", // "/html/body/div[3]/div/div[13]/div/div[2]/div[2]/div/div/div/div/div/div/div[1]/div/div/span/a",
-            ))
-            .await
-            .unwrap();
+        let a_tags = driver.find_all(By::XPath("//a")).await.unwrap();
 
         for a_tag in a_tags {
             let href_attribute = a_tag.attr("href").await.unwrap();
@@ -254,6 +248,8 @@ async fn get_urls_from_google_searches(search_terms: Vec<String>) -> Result<Vec<
             }
         }
     }
+
+    driver.quit().await.unwrap();
 
     Ok(urls)
 }
