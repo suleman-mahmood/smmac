@@ -15,7 +15,7 @@ async fn main() -> std::io::Result<()> {
         configuration.application.host, configuration.application.port
     );
     let listener = TcpListener::bind(address)?;
-    let openai_client = OpenaiClient::default();
+    let openai_client = OpenaiClient::new(configuration.api_keys.openai);
 
     run(listener, connection_pool, openai_client)?.await
 }

@@ -1,6 +1,3 @@
-api_keys:
-  openai: "base_key"
-
 application:
   port: 80
 
@@ -8,5 +5,5 @@ database:
   port: 5432
   username: "postgres"
   password: "password"
-  database_name: "raabta"
+  database_name: "smmac"
   require_ssl: false

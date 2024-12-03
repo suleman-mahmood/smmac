@@ -15,6 +15,13 @@ impl Default for OpenaiClient {
 }
 
 impl OpenaiClient {
+    pub fn new(api_key: String) -> Self {
+        let config = OpenAIConfig::new().with_api_key(api_key);
+        OpenaiClient {
+            client: Client::with_config(config),
+        }
+    }
+
     pub async fn get_boolean_searches_from_niche(
         &self,
         niche: &str,
