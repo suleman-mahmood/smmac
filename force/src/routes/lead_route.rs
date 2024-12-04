@@ -11,6 +11,21 @@ struct GetLeadsFromNicheQuery {
     // requester_email: String,
 }
 
+#[get("/gpt")]
+async fn get_gpt_results(
+    body: web::Query<GetLeadsFromNicheQuery>,
+    openai_client: web::Data<OpenaiClient>,
+) -> HttpResponse {
+    let products = openai_client
+        .get_boolean_searches_from_niche(&body.niche)
+        .await;
+
+    match products {
+        Ok(products) => HttpResponse::Ok().json(products),
+        Err(e) => HttpResponse::Ok().body(format!("Got error: {}", e)),
+    }
+}
+
 #[get("")]
 async fn get_leads_from_niche(
     openai_client: web::Data<OpenaiClient>,

@@ -29,7 +29,11 @@ pub fn run(
         App::new()
             .wrap(Logger::default())
             .service(default_route::default)
-            .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
+            .service(
+                web::scope("/lead")
+                    .service(lead_route::get_leads_from_niche)
+                    .service(lead_route::get_gpt_results),
+            )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())
             .app_data(droid.clone())

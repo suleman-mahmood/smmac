@@ -1,6 +1,10 @@
 use std::error::Error;
 
-use async_openai::{config::OpenAIConfig, types::CreateCompletionRequestArgs, Client};
+use async_openai::{
+    config::OpenAIConfig,
+    types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs},
+    Client,
+};
 
 pub struct OpenaiClient {
     client: Client<OpenAIConfig>,
@@ -26,33 +30,38 @@ impl OpenaiClient {
         &self,
         niche: &str,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let request = CreateCompletionRequestArgs::default()
-            .model("gpt-3.5-turbo-instruct")
-            .prompt(
-                format!(
+        let request = CreateChatCompletionRequestArgs::default()
+            .model("gpt-4o-mini")
+            .messages([ChatCompletionRequestUserMessageArgs::default()
+                .content(format!(
                     r#"
                     Give names of different product examples in the following niche: {}
-                    Only return 200 product names. In the following format:
-                    "Product 1" AND "buy now". Product name and buy now should always be in quotation marks i.e. "".
-                    Lastly do not give numbers to products. follow the format I gave you strictly.
-                    "#,
+                    Only return 200 product names in a list but don't start with a bullet point.
+                    Do not give numbers to products.
+                "#,
                     niche
-                )
-            )
-            .max_tokens(300_u32) // 64000_u32 for prod
+                ))
+                .build()?
+                .into()])
+            .max_tokens(1000_u32)
             .build()?;
 
-        let response = self.client.completions().create(request).await?;
+        let response = self.client.chat().create(request).await?;
         log::info!("Response: {:?}", response);
 
         let first_choice = response
             .choices
             .first()
             .ok_or("No choices in Openai response")?
-            .text
-            .clone();
+            .message
+            .content
+            .clone()
+            .ok_or("No content")?;
 
-        let searches: Vec<String> = first_choice.split("\n").map(|s| s.to_string()).collect();
+        let searches: Vec<String> = first_choice
+            .split("\n")
+            .map(|s| s.trim().to_string())
+            .collect();
 
         Ok(searches)
     }
