@@ -47,6 +47,12 @@ async fn get_urls_from_google_searches(
     driver: &WebDriver,
     products: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
+    /*
+     * Prepare 10 browsers with 10 different ips
+     * For each url:
+     ** Randomly select one browser from pool
+     ** Scrape the link
+     * */
     let search_urls: Vec<String> = products
         .iter()
         .map(|st| build_seach_url(st.to_string()))
