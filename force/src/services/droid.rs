@@ -1,7 +1,4 @@
-use rand::seq::SliceRandom;
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
-
-const PROXY_LIST: [&str; 1] = ["http://uzuugbox-rotate:mgbqddrmu9fi@p.webshare.io:80/"];
 
 pub struct Droid {
     pub driver: WebDriver,
@@ -26,13 +23,8 @@ impl Droid {
 
         let proxy = Proxy::Manual {
             ftp_proxy: None,
-            http_proxy: Some(
-                PROXY_LIST
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .to_string(),
-            ),
-            ssl_proxy: None,
+            http_proxy: Some("http://zqsggygg-rotate:ty7ut0nxi4yp@p.webshare.io:80/".to_string()),
+            ssl_proxy: Some("http://zqsggygg-rotate:ty7ut0nxi4yp@p.webshare.io:80/".to_string()),
             socks_proxy: None,
             socks_version: None,
             socks_username: None,
