@@ -9,7 +9,7 @@ use actix_web::{
 use sqlx::PgPool;
 
 use crate::{
-    routes::{default_route, lead_route},
+    routes::{default_route, experiment_route, lead_route},
     services::{Droid, OpenaiClient},
 };
 
@@ -29,11 +29,8 @@ pub fn run(
         App::new()
             .wrap(Logger::default())
             .service(default_route::default)
-            .service(
-                web::scope("/lead")
-                    .service(lead_route::get_leads_from_niche)
-                    .service(lead_route::get_gpt_results),
-            )
+            .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
+            .service(web::scope("/exp").service(experiment_route::get_gpt_results))
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())
             .app_data(droid.clone())
