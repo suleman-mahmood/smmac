@@ -1,14 +1,14 @@
 use actix_web::{get, web, HttpResponse};
 use serde::Deserialize;
 use sqlx::PgPool;
-use thirtyfour::{error::WebDriverError, By, DesiredCapabilities, WebDriver};
+use thirtyfour::{error::WebDriverError, By, WebDriver};
 
 use crate::services::{Droid, OpenaiClient};
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
     niche: String,
-    requester_email: String,
+    // requester_email: String,
 }
 
 #[get("")]
