@@ -23,6 +23,7 @@ config = "0.14"
 uuid = {version="1", features=["v4"]}
 async-openai = "0.26"
 thirtyfour = "0.34.0"
+rand = "0.8"
 
 [dependencies.sqlx]
 version = "0.8"

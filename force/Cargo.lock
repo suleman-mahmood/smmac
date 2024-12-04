@@ -1071,6 +1071,7 @@ dependencies = [
  "config",
  "env_logger",
  "log",
+ "rand",
  "reqwest",
  "serde",
  "serde-aux",
