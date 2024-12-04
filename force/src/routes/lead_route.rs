@@ -1,7 +1,7 @@
 use actix_web::{get, web, HttpResponse};
 use serde::Deserialize;
 use sqlx::PgPool;
-use thirtyfour::{By, DesiredCapabilities, WebDriver};
+use thirtyfour::{error::WebDriverError, By, DesiredCapabilities, WebDriver};
 
 use crate::services::{Droid, OpenaiClient};
 
@@ -46,30 +46,34 @@ async fn get_leads_from_niche(
 async fn get_urls_from_google_searches(
     driver: &WebDriver,
     search_terms: Vec<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, WebDriverError> {
     let search_urls: Vec<String> = search_terms
         .iter()
         .map(|st| format!("https://www.google.com/search?q={}", st))
         .collect();
 
     let mut urls: Vec<String> = vec![];
+    let mut next_search_urls: Vec<String> = vec![];
 
     for url in search_urls.iter() {
-        driver.goto(url).await.unwrap();
+        driver.goto(url).await?;
 
         // TODO: Check and combine with the below selector
-        let a_tag = driver.find(By::XPath("//a")).await;
-        if a_tag.is_err() {
+        if driver.find(By::XPath("//a")).await.is_err() {
             continue;
         }
 
-        let a_tags = driver.find_all(By::XPath("//a")).await.unwrap();
-
-        for a_tag in a_tags {
-            let href_attribute = a_tag.attr("href").await.unwrap();
+        for a_tag in driver.find_all(By::XPath("//a")).await? {
+            let href_attribute = a_tag.attr("href").await?;
             if let Some(href) = href_attribute {
                 log::info!("Added url: {}", href);
                 urls.push(href);
+            }
+        }
+
+        if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
+            if let Some(href_attribute) = next_page_element.attr("href").await? {
+                next_search_urls.push(href_attribute);
             }
         }
     }
