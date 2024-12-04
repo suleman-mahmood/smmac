@@ -60,11 +60,11 @@ async fn get_leads_from_niche(
 
 async fn get_urls_from_google_searches(
     driver: &WebDriver,
-    search_terms: Vec<String>,
+    products: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
-    let search_urls: Vec<String> = search_terms
+    let search_urls: Vec<String> = products
         .iter()
-        .map(|st| format!("https://www.google.com/search?q={}", st))
+        .map(|st| build_seach_url(st.to_string()))
         .collect();
 
     let mut urls: Vec<String> = vec![];
@@ -94,4 +94,9 @@ async fn get_urls_from_google_searches(
     }
 
     Ok(urls)
+}
+
+fn build_seach_url(product: String) -> String {
+    let boolean_query = format!(r#""{}" AND "buy now""#, product);
+    format!("https://www.google.com/search?q={}", boolean_query)
 }
