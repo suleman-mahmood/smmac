@@ -1,7 +1,11 @@
 use std::net::TcpListener;
 
 use env_logger::Env;
-use force::{configuration::get_configuration, services::OpenaiClient, startup::run};
+use force::{
+    configuration::get_configuration,
+    services::{Droid, OpenaiClient},
+    startup::run,
+};
 use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
@@ -16,6 +20,7 @@ async fn main() -> std::io::Result<()> {
     );
     let listener = TcpListener::bind(address)?;
     let openai_client = OpenaiClient::new(configuration.api_keys.openai);
+    let droid = Droid::new().await;
 
-    run(listener, connection_pool, openai_client)?.await
+    run(listener, connection_pool, openai_client, droid)?.await
 }
