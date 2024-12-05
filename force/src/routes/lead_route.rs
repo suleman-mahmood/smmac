@@ -45,11 +45,12 @@ async fn get_leads_from_niche(
     let domains = extract_domains_from_urls(urls);
     // TODO: remove duplicate domains
 
-    let founders = get_founders_from_google_searches(&droid.drivers, domains)
+    let raw_founders = get_founders_from_google_searches(&droid.drivers, domains)
         .await
         .unwrap();
 
     // TODO: Extract founder names from the tags scraped
+    let founders = extract_founder_names(raw_founders);
 
     HttpResponse::Ok().body(format!("Founders: {:?}", founders))
 }
@@ -107,7 +108,7 @@ async fn get_urls_from_google_searches(
     Ok(domain_urls)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct FounderTagCandidate {
     h3_tags: Vec<String>,
     span_tags: Vec<String>,
@@ -210,9 +211,58 @@ fn extract_domains_from_urls(urls: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+fn extract_founder_names(founder_candidates: Vec<FounderTagCandidate>) -> Vec<FounderTagCandidate> {
+    founder_candidates
+        .iter()
+        .map(|fc| {
+            let h3_tags = fc
+                .h3_tags
+                .iter()
+                .map(|t| {
+                    todo!();
+                })
+                .collect();
+            let span_tags = fc
+                .span_tags
+                .iter()
+                .filter_map(|t| match t.strip_prefix("LinkedIn Â· ") {
+                    Some(right_word) => {
+                        let right_word_original = right_word.to_string();
+
+                        let result = match right_word.split(",").collect::<Vec<&str>>().as_slice() {
+                            [name, ..] => name.to_string(),
+                            _ => right_word_original,
+                        };
+
+                        let result = match result.contains("Dr.") {
+                            true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
+                            false => result,
+                        };
+                        let result = match result.contains("Dr") {
+                            true => result.strip_prefix("Dr").unwrap().trim().to_string(),
+                            false => result,
+                        };
+
+                        Some(result)
+                    }
+                    None => None,
+                })
+                .collect();
+
+            FounderTagCandidate {
+                h3_tags,
+                span_tags,
+                domain: fc.domain.clone(),
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::routes::lead_route::{extract_domains_from_urls, filter_raw_urls};
+    use crate::routes::lead_route::{
+        extract_domains_from_urls, extract_founder_names, filter_raw_urls, FounderTagCandidate,
+    };
 
     #[test]
     fn filter_raw_urls_invalid() {
@@ -278,5 +328,106 @@ mod tests {
                 "traditionalmedicinals.com",
             ]
         )
+    }
+
+    #[test]
+    fn extract_founder_names_valid() {
+        let candidates = vec![FounderTagCandidate {
+            h3_tags: vec![
+                // "Dan Go's Post".to_string(),
+                // "Eric Chuang on LinkedIn: Putting up the sign!".to_string(),
+                // "Dan Buettner's Post".to_string(),
+                // "Sarah Garone's Post".to_string(),
+                // "HÃ©lÃ¨ne de Troostembergh - Truly inspiring Tanguy Goretti".to_string(),
+                // "Samina Qureshi, RDN LD's Post".to_string(),
+                // "Tanguy Goretti's Post".to_string(),
+                // "Wondercise Technology Corp.".to_string(),
+                // "Dr. Gwilym Roddick's Post".to_string(),
+                // "Honor Whiteman - Senior Editorial Director - RVO Health".to_string(),
+                // "Tim Snaith - Newsletter Editor II - Medical News Today".to_string(),
+                // "Hasnain Sajjad on LinkedIn: #al".to_string(),
+                // "Dr Veer Pushpak Gupta - nhs #healthcare #unitedkingdom".to_string(),
+                // "Beth Frates, MD's Post".to_string(),
+                // "Deepak L. Bhatt, MD, MPH, MBA's Post".to_string(),
+                // "Dr. Ronald Klatz, MD, DO's Post".to_string(),
+                // "WellTheory".to_string(),
+                // "Uma Naidoo, MD".to_string(),
+                // "Dr William Bird MBE's Post".to_string(),
+                // "Georgette Smart - CEO E*HealthLine".to_string(),
+                // "David Kopp's Post".to_string(),
+                // "West Shell III - GOES (Global Outdoor Emergency Support)".to_string(),
+                // "Cathy Cassata - Freelance Writer - Healthline Networks, Inc.".to_string(),
+                // "Healthline Media".to_string(),
+                // "Health Line - Healthline Team Member".to_string(),
+                // "David Mills - Associate editor - healthline.com".to_string(),
+                // "Kevin Yoshiyama - Healthline Media".to_string(),
+                // "Cortland Dahl's Post".to_string(),
+                // "Kelsey Costa, MS, RDN's Post".to_string(),
+                // "babulal parashar - great innovation".to_string(),
+                // "Shravan Verma - Manager - PANI".to_string(),
+                // "anwar khan's Post".to_string(),
+                // "Christopher Dean - Sculptor Marble dreaming. collaborator ...".to_string(),
+                // "Manish Ambast's Post".to_string(),
+                // "Mark Balderman Highlove - Installation Specialist".to_string(),
+                // "100+ \"Partho Roy\" profiles".to_string(),
+                // "James Weisz on LinkedIn: #website #developer #film".to_string(),
+                // "Ravindra Prakash - Plant Manager - Shree Dhanwantri ...".to_string(),
+                // "Traditional Medicinals".to_string(),
+                // "Caitlin Landesberg on LinkedIn: Home".to_string(),
+                // "Traditional Medicinals".to_string(),
+                // "Joe Stanziano's Post".to_string(),
+                // "Traditional Medicinals | à¦²à¦¿à¦‚à¦•à¦¡à¦‡à¦¨".to_string(),
+                // "Kathy Avilla - Traditional Medicinals, Inc.".to_string(),
+                // "Ben Hindman's Post - sxsw".to_string(),
+                // "David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string(),
+            ],
+            span_tags: vec![
+                "LinkedIn Â· Dan Go".to_string(),
+                "LinkedIn Â· HÃ©lÃ¨ne de Troostembergh".to_string(),
+                "LinkedIn Â· Samina Qureshi, RDN LD".to_string(),
+                "LinkedIn Â· Wondercise Technology Corp.".to_string(),
+                "LinkedIn Â· Dr Veer Pushpak Gupta".to_string(),
+                "LinkedIn Â· Hasnain Sajjad".to_string(),
+                "LinkedIn Â· Deepak L. Bhatt, MD, MPH, MBA".to_string(),
+                "LinkedIn Â· Dr. Ronald Klatz, MD, DO".to_string(),
+                "LinkedIn Â· WellTheory".to_string(),
+                "LinkedIn Â· West Shell III".to_string(),
+                "LinkedIn Â· Cathy Cassata".to_string(),
+                "LinkedIn Â· Shravan Verma".to_string(),
+                "LinkedIn Â· anwar khan".to_string(),
+                "LinkedIn Â· Christopher Dean".to_string(),
+                "LinkedIn India".to_string(),
+                "LinkedIn".to_string(),
+            ],
+            domain: "verywellfit.com".to_string(),
+        }];
+
+        let expected = vec![FounderTagCandidate {
+            h3_tags: vec![
+                // "Dan Go".to_string(),
+                // "Dan Gods".to_string(),
+                // "Dan Godsfj".to_string(),
+            ],
+            span_tags: vec![
+                "Dan Go".to_string(),
+                "HÃ©lÃ¨ne de Troostembergh".to_string(),
+                "Samina Qureshi".to_string(),
+                "Wondercise Technology Corp.".to_string(),
+                "Veer Pushpak Gupta".to_string(),
+                "Hasnain Sajjad".to_string(),
+                "Deepak L. Bhatt".to_string(),
+                "Ronald Klatz".to_string(),
+                "WellTheory".to_string(),
+                "West Shell III".to_string(),
+                "Cathy Cassata".to_string(),
+                "Shravan Verma".to_string(),
+                "anwar khan".to_string(),
+                "Christopher Dean".to_string(),
+            ],
+            domain: "verywellfit.com".to_string(),
+        }];
+
+        let results = extract_founder_names(candidates);
+        assert_eq!(results, expected)
     }
 }
