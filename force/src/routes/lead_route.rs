@@ -1,4 +1,5 @@
 use actix_web::{get, web, HttpResponse};
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -43,7 +44,9 @@ async fn get_leads_from_niche(
 
     let urls = filter_raw_urls(raw_urls);
     let domains = extract_domains_from_urls(urls);
-    // TODO: remove duplicate domains
+
+    // Remove duplicate domains
+    let domains = domains.into_iter().unique().collect();
 
     let raw_founders = get_founders_from_google_searches(&droid.drivers, domains)
         .await
