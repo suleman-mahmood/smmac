@@ -43,8 +43,15 @@ async fn get_leads_from_niche(
 
     let urls = filter_raw_urls(raw_urls);
     let domains = extract_domains_from_urls(urls);
+    // TODO: remove duplicate domains
 
-    HttpResponse::Ok().json(domains)
+    let founders = get_founders_from_google_searches(&droid.drivers, domains)
+        .await
+        .unwrap();
+
+    // TODO: Extract founder names from the tags scraped
+
+    HttpResponse::Ok().body(format!("Founders: {:?}", founders))
 }
 
 async fn get_urls_from_google_searches(
@@ -71,18 +78,20 @@ async fn get_urls_from_google_searches(
 
             driver.goto(url).await?;
 
-            // TODO: Check and combine with the below selector
+            // Check if no results found
             if driver.find(By::XPath("//a")).await.is_err() {
+                log::error!("Found no results on url: {}", url);
                 continue;
             }
 
             for a_tag in driver.find_all(By::XPath("//a")).await? {
                 let href_attribute = a_tag.attr("href").await?;
                 if let Some(href) = href_attribute {
-                    log::info!("Added url: {}", href);
                     domain_urls.push(href);
                 }
             }
+
+            log::info!("Found {} urls", domain_urls.len(),);
 
             if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
                 if let Some(href_attribute) = next_page_element.attr("href").await? {
@@ -98,8 +107,75 @@ async fn get_urls_from_google_searches(
     Ok(domain_urls)
 }
 
+#[derive(Debug)]
+struct FounderTagCandidate {
+    h3_tags: Vec<String>,
+    span_tags: Vec<String>,
+    domain: String,
+}
+
+async fn get_founders_from_google_searches(
+    drivers: &Vec<WebDriver>,
+    domains: Vec<String>,
+) -> Result<Vec<FounderTagCandidate>, WebDriverError> {
+    // TODO: Add more build search url permutations as needed
+
+    let search_urls: Vec<String> = domains
+        .iter()
+        .map(|d| build_founder_seach_url(d.to_string()))
+        .collect();
+
+    let mut founder_candidate: Vec<FounderTagCandidate> = vec![];
+
+    for (url, domain) in search_urls.iter().zip(domains.iter()) {
+        let mut h3_tags = vec![];
+        let mut span_tags = vec![];
+        let driver = drivers.choose(&mut rand::thread_rng()).unwrap();
+
+        driver.goto(url).await?;
+
+        // Check if no results found
+        if driver.find(By::XPath("//h3")).await.is_err() {
+            log::error!("Found no results on url: {}", url);
+            continue;
+        }
+
+        for h3_tag in driver.find_all(By::XPath("//h3")).await? {
+            let text = h3_tag.text().await?;
+            h3_tags.push(text);
+        }
+
+        for span_tag in driver
+            .find_all(By::XPath("//h3/following-sibling::div/div/div/div[1]/span"))
+            .await?
+        {
+            let text = span_tag.text().await?;
+            span_tags.push(text);
+        }
+
+        log::info!(
+            "Found {} h3_tags, {} span_tags",
+            h3_tags.len(),
+            span_tags.len()
+        );
+
+        founder_candidate.push(FounderTagCandidate {
+            h3_tags,
+            span_tags,
+            domain: domain.to_string(),
+        });
+    }
+
+    Ok(founder_candidate)
+}
+
 fn build_seach_url(product: String) -> String {
     let boolean_query = format!(r#""{}" AND "buy now""#, product);
+    format!("https://www.google.com/search?q={}", boolean_query)
+}
+
+fn build_founder_seach_url(domain: String) -> String {
+    let boolean_query = format!(r#"site:linkedin.com "{}" AND "founder""#, domain);
     format!("https://www.google.com/search?q={}", boolean_query)
 }
 
