@@ -124,7 +124,13 @@ fn filter_raw_urls(urls: Vec<String>) -> Vec<String> {
 
 fn extract_domains_from_urls(urls: Vec<String>) -> Vec<String> {
     urls.iter()
-        .map(|u| Url::parse(u).unwrap().host_str().unwrap().to_string())
+        .map(|u| {
+            let host = Url::parse(u).unwrap().host_str().unwrap().to_string();
+            match host.strip_prefix("www.") {
+                Some(h) => h.to_string(),
+                None => host.to_string(),
+            }
+        })
         .collect()
 }
 
@@ -187,13 +193,13 @@ mod tests {
         assert_eq!(
             results,
             vec![
-                "www.znaturalfoods.com",
+                "znaturalfoods.com",
                 "dallosell.com",
-                "www.verywellfit.com",
-                "www.medicalnewstoday.com",
-                "www.healthline.com",
+                "verywellfit.com",
+                "medicalnewstoday.com",
+                "healthline.com",
                 "organicindia.com",
-                "www.traditionalmedicinals.com",
+                "traditionalmedicinals.com",
             ]
         )
     }
