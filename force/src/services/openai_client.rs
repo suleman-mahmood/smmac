@@ -36,14 +36,14 @@ impl OpenaiClient {
                 .content(format!(
                     r#"
                     Give names of different product examples in the following niche: {}
-                    Only return 200 product names in a list but don't start with a bullet point.
+                    Only return 10 product names in a list but don't start with a bullet point.
                     Do not give numbers to products.
                 "#,
                     niche
                 ))
                 .build()?
                 .into()])
-            .max_tokens(1000_u32)
+            .max_tokens(300_u32)
             .build()?;
 
         let response = self.client.chat().create(request).await?;

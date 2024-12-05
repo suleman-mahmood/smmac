@@ -1,8 +1,9 @@
 use actix_web::{get, web, HttpResponse};
+use rand::seq::SliceRandom;
 use serde::Deserialize;
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 
-use crate::services::OpenaiClient;
+use crate::services::{Droid, OpenaiClient};
 
 #[derive(Deserialize)]
 struct NicheQuery {
@@ -53,4 +54,15 @@ async fn open_multiple_browsers() -> HttpResponse {
     }
 
     HttpResponse::Ok().body("Opened multiple browsers")
+}
+
+#[get("/next-search")]
+async fn next_search(droid: web::Data<Droid>) -> HttpResponse {
+    let url = "/search?q=Organic+Tea+Tree+Hand+Cream+AND+buy+now&sca_esv=293021c43ebdc58d&sxsrf=ADLYWILkv5MxD0NCkSm12R2B4ekP8njTwA:1733322479740&ei=72ZQZ8HuLKmX4-EPo6y06Q4&start=10&sa=N&sstk=ATObxK6-74Hr_V35WxL_uX774bmYXqXFtGbrolRqun70NhRsGGFP9SyzYYM8dQQuqwfJm8YX9ldgm7sHk5iWYzQAGbfa-eofR4tDig&ved=2ahUKEwiBor61qY6KAxWpyzgGHSMWLe0Q8NMDegQIDBAW";
+
+    let url = format!("https://www.google.com{}", url);
+    let driver = droid.drivers.choose(&mut rand::thread_rng()).unwrap();
+    driver.goto(url).await.unwrap();
+
+    HttpResponse::Ok().body("Ok")
 }

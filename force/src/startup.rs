@@ -33,7 +33,8 @@ pub fn run(
             .service(
                 web::scope("/exp")
                     .service(experiment_route::get_gpt_results)
-                    .service(experiment_route::open_multiple_browsers),
+                    .service(experiment_route::open_multiple_browsers)
+                    .service(experiment_route::next_search),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())

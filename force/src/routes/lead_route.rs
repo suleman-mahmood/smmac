@@ -1,9 +1,12 @@
 use actix_web::{get, web, HttpResponse};
+use rand::seq::SliceRandom;
 use serde::Deserialize;
 use sqlx::PgPool;
 use thirtyfour::{error::WebDriverError, By, WebDriver};
 
 use crate::services::{Droid, OpenaiClient};
+
+const DEPTH_GOOGLE_SEACH_PAGES: u8 = 5;
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -33,58 +36,65 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    let urls = get_urls_from_google_searches(&droid.driver, products).await;
+    let urls = get_urls_from_google_searches(&droid.drivers, products).await;
 
     match urls {
-        Ok(urls) => log::info!("Got urls: {:?}", urls),
-        Err(e) => log::error!("Error: {}", e),
+        Ok(urls) => HttpResponse::Ok().json(urls),
+        Err(e) => {
+            HttpResponse::Ok().body(format!("Error at fetching urls from google search: {}", e))
+        }
     }
-
-    HttpResponse::Ok().body("Works!")
 }
 
 async fn get_urls_from_google_searches(
-    driver: &WebDriver,
+    drivers: &Vec<WebDriver>,
     products: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
     /*
-     * Prepare 10 browsers with 10 different ips
      * For each url:
      ** Randomly select one browser from pool
      ** Scrape the link
      * */
-    let search_urls: Vec<String> = products
+    let mut search_urls: Vec<String> = products
         .iter()
         .map(|st| build_seach_url(st.to_string()))
         .collect();
 
-    let mut urls: Vec<String> = vec![];
-    let mut next_search_urls: Vec<String> = vec![];
+    let mut domain_urls: Vec<String> = vec![];
 
-    for url in search_urls.iter() {
-        driver.goto(url).await?;
+    for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
+        let mut next_page_urls: Vec<String> = vec![];
 
-        // TODO: Check and combine with the below selector
-        if driver.find(By::XPath("//a")).await.is_err() {
-            continue;
-        }
+        for url in search_urls.iter() {
+            let driver = drivers.choose(&mut rand::thread_rng()).unwrap();
 
-        for a_tag in driver.find_all(By::XPath("//a")).await? {
-            let href_attribute = a_tag.attr("href").await?;
-            if let Some(href) = href_attribute {
-                log::info!("Added url: {}", href);
-                urls.push(href);
+            driver.goto(url).await?;
+
+            // TODO: Check and combine with the below selector
+            if driver.find(By::XPath("//a")).await.is_err() {
+                continue;
+            }
+
+            for a_tag in driver.find_all(By::XPath("//a")).await? {
+                let href_attribute = a_tag.attr("href").await?;
+                if let Some(href) = href_attribute {
+                    log::info!("Added url: {}", href);
+                    domain_urls.push(href);
+                }
+            }
+
+            if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
+                if let Some(href_attribute) = next_page_element.attr("href").await? {
+                    let next_url = format!("https://www.google.com{}", href_attribute);
+                    next_page_urls.push(next_url);
+                }
             }
         }
 
-        if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
-            if let Some(href_attribute) = next_page_element.attr("href").await? {
-                next_search_urls.push(href_attribute);
-            }
-        }
+        search_urls = next_page_urls;
     }
 
-    Ok(urls)
+    Ok(domain_urls)
 }
 
 fn build_seach_url(product: String) -> String {

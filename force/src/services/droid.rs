@@ -1,7 +1,9 @@
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 
+const NUM_PARALLEL_DRIVERS: u8 = 10_u8;
+
 pub struct Droid {
-    pub driver: WebDriver,
+    pub drivers: Vec<WebDriver>,
 }
 
 impl Droid {
@@ -20,13 +22,17 @@ impl Droid {
         };
         caps.set_proxy(proxy).unwrap();
 
-        // http://chrome:4444/wd/hub
-        // http://localhost:58656
-        let driver = WebDriver::new("http://localhost:62510", caps)
-            .await
-            .unwrap();
-        driver.maximize_window().await.unwrap();
+        let mut drivers: Vec<WebDriver> = vec![];
+        for _ in 0..NUM_PARALLEL_DRIVERS {
+            // http://chrome:4444/wd/hub
+            // http://localhost:58656
+            let new_driver = WebDriver::new("http://localhost:62510", caps.clone())
+                .await
+                .unwrap();
+            new_driver.maximize_window().await.unwrap();
+            drivers.push(new_driver);
+        }
 
-        Droid { driver }
+        Droid { drivers }
     }
 }
