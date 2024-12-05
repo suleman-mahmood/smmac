@@ -37,17 +37,14 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    let raw_urls = get_urls_from_google_searches(&droid.drivers, products).await;
+    let raw_urls = get_urls_from_google_searches(&droid.drivers, products)
+        .await
+        .unwrap();
 
-    match raw_urls {
-        Ok(raw_urls) => {
-            let urls = filter_raw_urls(raw_urls);
-            HttpResponse::Ok().json(urls)
-        }
-        Err(e) => {
-            HttpResponse::Ok().body(format!("Error at fetching urls from google search: {}", e))
-        }
-    }
+    let urls = filter_raw_urls(raw_urls);
+    let domains = extract_domains_from_urls(urls);
+
+    HttpResponse::Ok().json(domains)
 }
 
 async fn get_urls_from_google_searches(
@@ -125,12 +122,18 @@ fn filter_raw_urls(urls: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+fn extract_domains_from_urls(urls: Vec<String>) -> Vec<String> {
+    urls.iter()
+        .map(|u| Url::parse(u).unwrap().host_str().unwrap().to_string())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::routes::lead_route::filter_raw_urls;
+    use crate::routes::lead_route::{extract_domains_from_urls, filter_raw_urls};
 
     #[test]
-    fn test_filter_raw_urls_invalid() {
+    fn filter_raw_urls_invalid() {
         let raw_urls = [
             "https://support.google.com/websearch/answer/181196?hl=en-PK",
             "https://www.google.com/webhp?hl=en&sa=X&ved=0ahUKEwi2j67hto6KAxWkyDgGHXxuE0wQPAgI",
@@ -151,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_raw_urls_valid() {
+    fn filter_raw_urls_valid() {
         let raw_urls = [
             "https://www.znaturalfoods.com/products/green-tea-organic",
             "https://dallosell.com/product_detail/organic-green-tea-bag",
@@ -165,5 +168,33 @@ mod tests {
         let results = filter_raw_urls(raw_urls.clone());
 
         assert_eq!(results, raw_urls)
+    }
+
+    #[test]
+    fn extract_domains_valid() {
+        let urls = [
+            "https://www.znaturalfoods.com/products/green-tea-organic",
+            "https://dallosell.com/product_detail/organic-green-tea-bag",
+            "https://www.verywellfit.com/best-green-teas-5115813#:~:text=Certified%20organic%2C%20non%2DGMO%2C,Kyushu%20Island%20in%20southern%20Japan.",
+            "https://www.medicalnewstoday.com/articles/269538#:~:text=Research%20suggests%20it%20is%20safe,or%20interact%20with%20certain%20medications.",
+            "https://www.healthline.com/nutrition/top-10-evidence-based-health-benefits-of-green-tea#:~:text=A%202017%20research%20paper%20found,middle%2Daged%20and%20older%20adults.",
+            "https://organicindia.com/collections/green-tea?srsltid=AfmBOopzdn4oOzfSwiaITNekbORRUG_MoVF67dULVE9IEHV6zlvZL0Qc",
+            "https://www.traditionalmedicinals.com/products/green-tea-matcha?srsltid=AfmBOoqwv1CiL0XV_zNFmIWU1biT3S4xa-7KkOLzgXN4BkSCscGZFXzS",
+        ];
+        let urls: Vec<String> = urls.iter().map(|u| u.to_string()).collect();
+        let results = extract_domains_from_urls(urls);
+
+        assert_eq!(
+            results,
+            vec![
+                "www.znaturalfoods.com",
+                "dallosell.com",
+                "www.verywellfit.com",
+                "www.medicalnewstoday.com",
+                "www.healthline.com",
+                "organicindia.com",
+                "www.traditionalmedicinals.com",
+            ]
+        )
     }
 }
