@@ -1078,6 +1078,7 @@ dependencies = [
  "sqlx",
  "thirtyfour",
  "tokio",
+ "url",
  "uuid",
 ]
 

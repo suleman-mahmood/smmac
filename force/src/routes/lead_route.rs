@@ -3,6 +3,7 @@ use rand::seq::SliceRandom;
 use serde::Deserialize;
 use sqlx::PgPool;
 use thirtyfour::{error::WebDriverError, By, WebDriver};
+use url::Url;
 
 use crate::services::{Droid, OpenaiClient};
 
@@ -36,10 +37,13 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    let urls = get_urls_from_google_searches(&droid.drivers, products).await;
+    let raw_urls = get_urls_from_google_searches(&droid.drivers, products).await;
 
-    match urls {
-        Ok(urls) => HttpResponse::Ok().json(urls),
+    match raw_urls {
+        Ok(raw_urls) => {
+            let urls = filter_raw_urls(raw_urls);
+            HttpResponse::Ok().json(urls)
+        }
         Err(e) => {
             HttpResponse::Ok().body(format!("Error at fetching urls from google search: {}", e))
         }
@@ -100,4 +104,66 @@ async fn get_urls_from_google_searches(
 fn build_seach_url(product: String) -> String {
     let boolean_query = format!(r#""{}" AND "buy now""#, product);
     format!("https://www.google.com/search?q={}", boolean_query)
+}
+
+fn filter_raw_urls(urls: Vec<String>) -> Vec<String> {
+    urls.iter()
+        .filter(|u| match Url::parse(u) {
+            Ok(parsed_url) => match parsed_url.host_str() {
+                Some("support.google.com") => false,
+                Some("www.google.com") => false,
+                Some("accounts.google.com") => false,
+                Some("policies.google.com") => false,
+                Some("www.amazon.com") => false,
+                Some("") => false,
+                None => false,
+                Some(any_host) => !any_host.contains("google.com"),
+            },
+            Err(_) => false,
+        })
+        .map(|u| u.to_string())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::routes::lead_route::filter_raw_urls;
+
+    #[test]
+    fn test_filter_raw_urls_invalid() {
+        let raw_urls = [
+            "https://support.google.com/websearch/answer/181196?hl=en-PK",
+            "https://www.google.com/webhp?hl=en&sa=X&ved=0ahUKEwi2j67hto6KAxWkyDgGHXxuE0wQPAgI",
+            "https://www.google.com.pk/intl/en/about/products?tab=wh",
+            "https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/search%3Fq%3D%2522Organic%2520Green%2520Tea%2522%2520AND%2520%2522buy%2520now%2522&ec=GAZAAQ",
+            "/search?sca_esv=0c2f7fc6ddd47e94&q=%22Organic+Green+Tea%22+AND+%22buy+now%22&udm=2&fbs=AEQNm0Aa4sjWe7Rqy32pFwRj0UkWd8nbOJfsBGGB5IQQO6L3JyJJclJuzBPl12qJyPx7ESJehObpS5jg6J88CCM-RK72sNV8xvbUxy-SoOtM-WmPLIjZzuRzEJJ0u2V8OeDS2QzrFq0l6uL0u5ydk68vXkBqxln9Kbinx1HZnJEg4P6VfVQ98eE&sa=X&ved=2ahUKEwi2j67hto6KAxWkyDgGHXxuE0wQtKgLegQIFhAB",
+            "/finance?sca_esv=0c2f7fc6ddd47e94&output=search&q=%22Organic+Green+Tea%22+AND+%22buy+now%22&source=lnms&fbs=AEQNm0Aa4sjWe7Rqy32pFwRj0UkWd8nbOJfsBGGB5IQQO6L3JyJJclJuzBPl12qJyPx7ESJehObpS5jg6J88CCM-RK72sNV8xvbUxy-SoOtM-WmPLIjZzuRzEJJ0u2V8OeDS2QzrFq0l6uL0u5ydk68vXkBqxln9Kbinx1HZnJEg4P6VfVQ98eE&sa=X&ved=2ahUKEwi2j67hto6KAxWkyDgGHXxuE0wQ0pQJegQIExAB",
+            "https://policies.google.com/privacy?hl=en-PK&fg=1",
+            "https://policies.google.com/terms?hl=en-PK&fg=1",
+            "https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/search%3Fq%3D%2522Organic%2BAgave%2BNectar%2522%2BAND%2B%2522buy%2Bnow%2522%26sca_esv%3D0c2f7fc6ddd47e94%26ei%3DZHVQZ6CXDqCo4-EPlJeE4AM%26start%3D40%26sa%3DN%26ved%3D2ahUKEwig2YKat46KAxUg1DgGHZQLATw4HhDw0wN6BAgJEBU&ec=GAZAAQ",
+            "#",
+            "https://www.amazon.com/Organic-Pure-Green-Tea-Bags/dp/B00FTAYNKE",
+        ];
+        let raw_urls = raw_urls.iter().map(|u| u.to_string()).collect();
+        let results = filter_raw_urls(raw_urls);
+
+        assert!(results.is_empty())
+    }
+
+    #[test]
+    fn test_filter_raw_urls_valid() {
+        let raw_urls = [
+            "https://www.znaturalfoods.com/products/green-tea-organic",
+            "https://dallosell.com/product_detail/organic-green-tea-bag",
+            "https://www.verywellfit.com/best-green-teas-5115813#:~:text=Certified%20organic%2C%20non%2DGMO%2C,Kyushu%20Island%20in%20southern%20Japan.",
+            "https://www.medicalnewstoday.com/articles/269538#:~:text=Research%20suggests%20it%20is%20safe,or%20interact%20with%20certain%20medications.",
+            "https://www.healthline.com/nutrition/top-10-evidence-based-health-benefits-of-green-tea#:~:text=A%202017%20research%20paper%20found,middle%2Daged%20and%20older%20adults.",
+            "https://organicindia.com/collections/green-tea?srsltid=AfmBOopzdn4oOzfSwiaITNekbORRUG_MoVF67dULVE9IEHV6zlvZL0Qc",
+            "https://www.traditionalmedicinals.com/products/green-tea-matcha?srsltid=AfmBOoqwv1CiL0XV_zNFmIWU1biT3S4xa-7KkOLzgXN4BkSCscGZFXzS",
+        ];
+        let raw_urls: Vec<String> = raw_urls.iter().map(|u| u.to_string()).collect();
+        let results = filter_raw_urls(raw_urls.clone());
+
+        assert_eq!(results, raw_urls)
+    }
 }
