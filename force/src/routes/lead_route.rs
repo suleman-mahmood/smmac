@@ -236,7 +236,7 @@ fn extract_founder_names(
             //         todo!();
             //     })
             //     .collect();
-            let span_tags = fc
+            let span_tags: Vec<String> = fc
                 .span_tags
                 .iter()
                 .filter_map(|t| match t.strip_prefix("LinkedIn Â· ") {
@@ -263,6 +263,7 @@ fn extract_founder_names(
                 })
                 .collect();
 
+            let span_tags = span_tags.into_iter().unique().collect();
             DomainFounderQualified {
                 names: span_tags,
                 domain: fc.domain.clone(),
@@ -443,6 +444,7 @@ mod tests {
             ],
             span_tags: vec![
                 "LinkedIn Â· Dan Go".to_string(),
+                "LinkedIn Â· Dan Go".to_string(),
                 "LinkedIn Â· HÃ©lÃ¨ne de Troostembergh".to_string(),
                 "LinkedIn Â· Samina Qureshi, RDN LD".to_string(),
                 "LinkedIn Â· Wondercise Technology Corp.".to_string(),
@@ -450,6 +452,7 @@ mod tests {
                 "LinkedIn Â· Hasnain Sajjad".to_string(),
                 "LinkedIn Â· Deepak L. Bhatt, MD, MPH, MBA".to_string(),
                 "LinkedIn Â· Dr. Ronald Klatz, MD, DO".to_string(),
+                "LinkedIn Â· WellTheory".to_string(),
                 "LinkedIn Â· WellTheory".to_string(),
                 "LinkedIn Â· West Shell III".to_string(),
                 "LinkedIn Â· Cathy Cassata".to_string(),
