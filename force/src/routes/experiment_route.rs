@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use actix_web::{get, web, HttpResponse};
 use rand::seq::SliceRandom;
 use serde::Deserialize;
@@ -93,4 +95,25 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
     }
 
     HttpResponse::Ok().json(verified_emails)
+}
+
+#[get("/check-user-agent")]
+async fn check_user_agent(droid: web::Data<Droid>) -> HttpResponse {
+    let driver = droid.drivers.choose(&mut rand::thread_rng()).unwrap();
+    driver
+        .goto("https://www.whatismybrowser.com/detect/what-is-my-user-agent/")
+        .await
+        .unwrap();
+
+    HttpResponse::Ok().body("Ok!")
+}
+
+#[get("/check-ip-address")]
+async fn check_ip_address(droid: web::Data<Droid>) -> HttpResponse {
+    for _ in 0..5 {
+        let driver = droid.drivers.choose(&mut rand::thread_rng()).unwrap();
+        driver.goto("https://whatismyipaddress.com/").await.unwrap();
+    }
+
+    HttpResponse::Ok().body("Ok!")
 }

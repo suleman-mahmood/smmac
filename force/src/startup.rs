@@ -25,8 +25,6 @@ pub fn run(
     let droid = web::Data::new(droid);
     let sentinel = web::Data::new(sentinel);
 
-    log::info!("{:?}", std::env::var("OPENAI_API_KEY"));
-
     let server = HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
@@ -37,7 +35,9 @@ pub fn run(
                     .service(experiment_route::get_gpt_results)
                     .service(experiment_route::open_multiple_browsers)
                     .service(experiment_route::next_search)
-                    .service(experiment_route::verify_emails),
+                    .service(experiment_route::verify_emails)
+                    .service(experiment_route::check_user_agent)
+                    .service(experiment_route::check_ip_address),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())

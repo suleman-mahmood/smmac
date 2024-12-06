@@ -26,6 +26,7 @@ thirtyfour = "0.34.0"
 rand = "0.8"
 url = "2.5"
 itertools = "0.13"
+fake_user_agent = "0.2"
 
 [dependencies.sqlx]
 version = "0.8"
