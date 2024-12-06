@@ -118,6 +118,12 @@ struct FounderTagCandidate {
     domain: String,
 }
 
+#[derive(Debug, PartialEq)]
+struct DomainFounderQualified {
+    names: Vec<String>,
+    domain: String,
+}
+
 async fn get_founders_from_google_searches(
     drivers: &Vec<WebDriver>,
     domains: Vec<String>,
@@ -214,17 +220,19 @@ fn extract_domains_from_urls(urls: Vec<String>) -> Vec<String> {
         .collect()
 }
 
-fn extract_founder_names(founder_candidates: Vec<FounderTagCandidate>) -> Vec<FounderTagCandidate> {
+fn extract_founder_names(
+    founder_candidates: Vec<FounderTagCandidate>,
+) -> Vec<DomainFounderQualified> {
     founder_candidates
         .iter()
         .map(|fc| {
-            let h3_tags = fc
-                .h3_tags
-                .iter()
-                .map(|t| {
-                    todo!();
-                })
-                .collect();
+            // let h3_tags = fc
+            //     .h3_tags
+            //     .iter()
+            //     .map(|t| {
+            //         todo!();
+            //     })
+            //     .collect();
             let span_tags = fc
                 .span_tags
                 .iter()
@@ -252,9 +260,8 @@ fn extract_founder_names(founder_candidates: Vec<FounderTagCandidate>) -> Vec<Fo
                 })
                 .collect();
 
-            FounderTagCandidate {
-                h3_tags,
-                span_tags,
+            DomainFounderQualified {
+                names: span_tags,
                 domain: fc.domain.clone(),
             }
         })
@@ -264,7 +271,8 @@ fn extract_founder_names(founder_candidates: Vec<FounderTagCandidate>) -> Vec<Fo
 #[cfg(test)]
 mod tests {
     use crate::routes::lead_route::{
-        extract_domains_from_urls, extract_founder_names, filter_raw_urls, FounderTagCandidate,
+        extract_domains_from_urls, extract_founder_names, filter_raw_urls, DomainFounderQualified,
+        FounderTagCandidate,
     };
 
     #[test]
@@ -405,13 +413,8 @@ mod tests {
             domain: "verywellfit.com".to_string(),
         }];
 
-        let expected = vec![FounderTagCandidate {
-            h3_tags: vec![
-                // "Dan Go".to_string(),
-                // "Dan Gods".to_string(),
-                // "Dan Godsfj".to_string(),
-            ],
-            span_tags: vec![
+        let expected = vec![DomainFounderQualified {
+            names: vec![
                 "Dan Go".to_string(),
                 "HÃ©lÃ¨ne de Troostembergh".to_string(),
                 "Samina Qureshi".to_string(),
