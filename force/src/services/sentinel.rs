@@ -8,7 +8,7 @@ pub struct Sentinel {
 }
 
 #[derive(Serialize)]
-struct PostBody {
+struct GetQuery {
     key: String,
     email: String,
 }
@@ -25,15 +25,15 @@ impl Sentinel {
         Sentinel {
             client,
             api_key,
-            url: "https://api-v4.bulkemailchecker.com/".to_string(),
+            url: "https://api.bulkemailchecker.com/real-time".to_string(),
         }
     }
 
     pub async fn verfiy_email(&self, email: String) -> bool {
         match self
             .client
-            .post(self.url.clone())
-            .json(&PostBody {
+            .get(self.url.clone())
+            .query(&GetQuery {
                 key: self.api_key.clone(),
                 email,
             })
