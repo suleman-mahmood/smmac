@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::services::{Droid, OpenaiClient, Sentinel};
 
-const DEPTH_GOOGLE_SEACH_PAGES: u8 = 5;
+const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1;
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -53,12 +53,23 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
+    let count = raw_founders
+        .iter()
+        .fold(0, |acc, x| acc + x.span_tags.len() + x.h3_tags.len());
+    log::info!("Total Raw Founders: {}", count);
+
     let founders = extract_founder_names(raw_founders);
 
-    let raw_emails = construct_emails(founders);
-    let emails = filter_verified_emails(sentinel, raw_emails).await;
+    let count = founders.iter().fold(0, |acc, x| acc + x.names.len());
+    log::info!("Total Qualified Founders: {}", count);
 
-    HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
+    let raw_emails = construct_emails(founders);
+
+    log::info!("Constructed emails: {}", raw_emails.len());
+    // let emails = filter_verified_emails(sentinel, raw_emails).await;
+
+    // HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
+    HttpResponse::Ok().json(raw_emails)
 }
 
 async fn get_urls_from_google_searches(
@@ -98,7 +109,7 @@ async fn get_urls_from_google_searches(
                 }
             }
 
-            log::info!("Found {} urls", domain_urls.len(),);
+            log::info!("Found {} urls, potential domains", domain_urls.len(),);
 
             if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
                 if let Some(href_attribute) = next_page_element.attr("href").await? {
@@ -167,7 +178,7 @@ async fn get_founders_from_google_searches(
         }
 
         log::info!(
-            "Found {} h3_tags, {} span_tags",
+            "Found {} h3_tags, {} span_tags, potential founder names",
             h3_tags.len(),
             span_tags.len()
         );
