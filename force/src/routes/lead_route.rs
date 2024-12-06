@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use actix_web::{get, web, HttpResponse};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -56,16 +58,24 @@ async fn get_leads_from_niche(
     let count = raw_founders
         .iter()
         .fold(0, |acc, x| acc + x.span_tags.len() + x.h3_tags.len());
+    log::info!(">>> >>> >>>");
     log::info!("Total Raw Founders: {}", count);
+    log::info!(">>> >>> >>>");
 
     let founders = extract_founder_names(raw_founders);
 
     let count = founders.iter().fold(0, |acc, x| acc + x.names.len());
+
+    log::info!(">>> >>> >>>");
     log::info!("Total Qualified Founders: {}", count);
+    log::info!(">>> >>> >>>");
 
     let raw_emails = construct_emails(founders);
 
+    log::info!(">>> >>> >>>");
     log::info!("Constructed emails: {}", raw_emails.len());
+    log::info!(">>> >>> >>>");
+
     // let emails = filter_verified_emails(sentinel, raw_emails).await;
 
     // HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
@@ -97,7 +107,7 @@ async fn get_urls_from_google_searches(
             driver.goto(url).await?;
 
             // Check if no results found
-            if driver.find(By::XPath("//a")).await.is_err() {
+            if driver.find(By::XPath("//h3")).await.is_err() {
                 log::error!("Found no results on url: {}", url);
                 continue;
             }
@@ -109,7 +119,10 @@ async fn get_urls_from_google_searches(
                 }
             }
 
-            log::info!("Found {} urls, potential domains", domain_urls.len(),);
+            log::info!(
+                "Commulative: Found {} urls, potential domains",
+                domain_urls.len(),
+            );
 
             if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
                 if let Some(href_attribute) = next_page_element.attr("href").await? {
