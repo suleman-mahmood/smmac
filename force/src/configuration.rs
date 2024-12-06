@@ -29,6 +29,7 @@ pub struct ApplicationSettings {
 #[derive(serde::Deserialize)]
 pub struct ApiKeys {
     pub openai: String,
+    pub bulk_email_checker: String,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

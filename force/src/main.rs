@@ -3,7 +3,7 @@ use std::net::TcpListener;
 use env_logger::Env;
 use force::{
     configuration::get_configuration,
-    services::{Droid, OpenaiClient},
+    services::{Droid, OpenaiClient, Sentinel},
     startup::run,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -21,6 +21,7 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
     let openai_client = OpenaiClient::new(configuration.api_keys.openai);
     let droid = Droid::new().await;
+    let sentinel = Sentinel::new(configuration.api_keys.bulk_email_checker);
 
-    run(listener, connection_pool, openai_client, droid)?.await
+    run(listener, connection_pool, openai_client, droid, sentinel)?.await
 }

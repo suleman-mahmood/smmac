@@ -10,7 +10,7 @@ use sqlx::PgPool;
 
 use crate::{
     routes::{default_route, experiment_route, lead_route},
-    services::{Droid, OpenaiClient},
+    services::{Droid, OpenaiClient, Sentinel},
 };
 
 pub fn run(
@@ -18,10 +18,12 @@ pub fn run(
     db_pool: PgPool,
     openai_client: OpenaiClient,
     droid: Droid,
+    sentinel: Sentinel,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let openai_client = web::Data::new(openai_client);
     let droid = web::Data::new(droid);
+    let sentinel = web::Data::new(sentinel);
 
     log::info!("{:?}", std::env::var("OPENAI_API_KEY"));
 
@@ -34,11 +36,13 @@ pub fn run(
                 web::scope("/exp")
                     .service(experiment_route::get_gpt_results)
                     .service(experiment_route::open_multiple_browsers)
-                    .service(experiment_route::next_search),
+                    .service(experiment_route::next_search)
+                    .service(experiment_route::verify_emails),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())
             .app_data(droid.clone())
+            .app_data(sentinel.clone())
     })
     .listen(listener)?
     .run();

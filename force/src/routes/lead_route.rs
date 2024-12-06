@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use thirtyfour::{error::WebDriverError, By, WebDriver};
 use url::Url;
 
-use crate::services::{Droid, OpenaiClient};
+use crate::services::{Droid, OpenaiClient, Sentinel};
 
 const DEPTH_GOOGLE_SEACH_PAGES: u8 = 5;
 
@@ -22,6 +22,7 @@ async fn get_leads_from_niche(
     body: web::Query<GetLeadsFromNicheQuery>,
     pool: web::Data<PgPool>,
     droid: web::Data<Droid>,
+    sentinel: web::Data<Sentinel>,
 ) -> HttpResponse {
     /*
     1. (v2) User verification and free tier count
@@ -55,8 +56,9 @@ async fn get_leads_from_niche(
     let founders = extract_founder_names(raw_founders);
 
     let raw_emails = construct_emails(founders);
+    let emails = filter_verified_emails(sentinel, raw_emails).await;
 
-    HttpResponse::Ok().body(format!("Raw emails: {:?}", raw_emails))
+    HttpResponse::Ok().body(format!("Raw emails: {:?}", emails))
 }
 
 async fn get_urls_from_google_searches(
@@ -301,6 +303,18 @@ fn construct_emails(domain_founders: Vec<DomainFounderQualified>) -> Vec<String>
     }
 
     emails
+}
+
+async fn filter_verified_emails(sentinel: web::Data<Sentinel>, emails: Vec<String>) -> Vec<String> {
+    let mut verified_emails: Vec<String> = vec![];
+
+    for em in emails {
+        if sentinel.verfiy_email(em.clone()).await {
+            verified_emails.push(em);
+        }
+    }
+
+    verified_emails
 }
 
 #[cfg(test)]

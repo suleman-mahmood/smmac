@@ -1,5 +1,6 @@
 api_keys:
-  openai: "local_key"
+  openai: "local_openai_key"
+  bulk_email_checker: "local_bulk_email_checker_key"
 
 application:
   host: "localhost"

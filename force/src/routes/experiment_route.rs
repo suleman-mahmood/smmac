@@ -3,7 +3,7 @@ use rand::seq::SliceRandom;
 use serde::Deserialize;
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 
-use crate::services::{Droid, OpenaiClient};
+use crate::services::{Droid, OpenaiClient, Sentinel};
 
 #[derive(Deserialize)]
 struct NicheQuery {
@@ -65,4 +65,32 @@ async fn next_search(droid: web::Data<Droid>) -> HttpResponse {
     driver.goto(url).await.unwrap();
 
     HttpResponse::Ok().body("Ok")
+}
+
+#[get("/verify-emails")]
+async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
+    let emails: Vec<String> = vec![
+        "dan@verywellfit.com".to_string(),
+        "go@verywellfit.com".to_string(),
+        "dango@verywellfit.com".to_string(),
+        "dan.go@verywellfit.com".to_string(),
+        "dang@verywellfit.com".to_string(),
+        "dgo@verywellfit.com".to_string(),
+        "samina@verywellfit.com".to_string(),
+        "qureshi@verywellfit.com".to_string(),
+        "saminaqureshi@verywellfit.com".to_string(),
+        "samina.qureshi@verywellfit.com".to_string(),
+        "saminaq@verywellfit.com".to_string(),
+        "squreshi@verywellfit.com".to_string(),
+        "suleman@mazlo.com".to_string(),
+    ];
+    let mut verified_emails: Vec<String> = vec![];
+
+    for em in emails {
+        if sentinel.verfiy_email(em.clone()).await {
+            verified_emails.push(em);
+        }
+    }
+
+    HttpResponse::Ok().json(verified_emails)
 }
