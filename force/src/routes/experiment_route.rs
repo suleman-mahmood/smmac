@@ -110,7 +110,7 @@ async fn check_user_agent(droid: web::Data<Droid>) -> HttpResponse {
 
 #[get("/check-ip-address")]
 async fn check_ip_address(droid: web::Data<Droid>) -> HttpResponse {
-    for _ in 0..5 {
+    for _ in 0..1 {
         let driver = droid.drivers.choose(&mut rand::thread_rng()).unwrap();
         driver.goto("https://whatismyipaddress.com/").await.unwrap();
     }

@@ -1,10 +1,11 @@
 use fake_user_agent::get_rua;
 use rand::seq::SliceRandom;
+use serde_json::json;
 use thirtyfour::{
     CapabilitiesHelper, ChromiumLikeCapabilities, DesiredCapabilities, Proxy, WebDriver,
 };
 
-const NUM_PARALLEL_DRIVERS: u8 = 10_u8;
+const NUM_PARALLEL_DRIVERS: u8 = 1_u8;
 
 const PROXIES: [&str; 10] = [
     "198.23.239.134:6540",
@@ -39,6 +40,13 @@ impl Droid {
                 no_proxy: None,
             };
             caps.set_proxy(proxy).unwrap();
+            caps.add_experimental_option(
+                "prefs",
+                json!({
+                    "profile.managed_default_content_settings.images": 2,
+                }),
+            )
+            .unwrap();
 
             caps.add_arg(&format!("--user-agent={}", get_rua()))
                 .unwrap();
