@@ -1,9 +1,9 @@
-use fake_user_agent::get_rua;
 use rand::seq::SliceRandom;
 use serde_json::json;
 use thirtyfour::{
     CapabilitiesHelper, ChromiumLikeCapabilities, DesiredCapabilities, Proxy, WebDriver,
 };
+use tokio::sync::Mutex;
 
 const NUM_PARALLEL_DRIVERS: u8 = 10_u8;
 
@@ -21,7 +21,7 @@ const PROXIES: [&str; 10] = [
 ];
 
 pub struct Droid {
-    pub drivers: Vec<WebDriver>,
+    pub drivers: Mutex<Vec<WebDriver>>,
 }
 
 impl Droid {
@@ -88,6 +88,8 @@ impl Droid {
             drivers.push(new_driver);
         }
 
-        Droid { drivers }
+        Droid {
+            drivers: Mutex::new(drivers),
+        }
     }
 }

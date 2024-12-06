@@ -1,11 +1,9 @@
-use std::{thread, time::Duration};
-
 use actix_web::{get, web, HttpResponse};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 use sqlx::PgPool;
-use thirtyfour::{error::WebDriverError, By, WebDriver};
+use thirtyfour::{error::WebDriverError, By};
 use url::Url;
 
 use crate::services::{Droid, OpenaiClient, Sentinel};
@@ -41,7 +39,7 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    let raw_urls = get_urls_from_google_searches(&droid.drivers, products)
+    let raw_urls = get_urls_from_google_searches(&droid, products)
         .await
         .unwrap();
 
@@ -51,7 +49,7 @@ async fn get_leads_from_niche(
     // Remove duplicate domains
     let domains = domains.into_iter().unique().collect();
 
-    let raw_founders = get_founders_from_google_searches(&droid.drivers, domains)
+    let raw_founders = get_founders_from_google_searches(&droid, domains)
         .await
         .unwrap();
 
@@ -83,7 +81,7 @@ async fn get_leads_from_niche(
 }
 
 async fn get_urls_from_google_searches(
-    drivers: &Vec<WebDriver>,
+    droid: &web::Data<Droid>,
     products: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
     /*
@@ -91,6 +89,8 @@ async fn get_urls_from_google_searches(
      ** Randomly select one browser from pool
      ** Scrape the link
      * */
+    let drivers = droid.drivers.lock().await;
+
     let mut search_urls: Vec<String> = products
         .iter()
         .map(|st| build_seach_url(st.to_string()))
@@ -152,10 +152,12 @@ struct DomainFounderQualified {
 }
 
 async fn get_founders_from_google_searches(
-    drivers: &Vec<WebDriver>,
+    droid: &web::Data<Droid>,
     domains: Vec<String>,
 ) -> Result<Vec<FounderTagCandidate>, WebDriverError> {
     // TODO: Add more build search url permutations as needed
+
+    let drivers = droid.drivers.lock().await;
 
     let search_urls: Vec<String> = domains
         .iter()
