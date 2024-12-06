@@ -58,7 +58,7 @@ async fn get_leads_from_niche(
     let raw_emails = construct_emails(founders);
     let emails = filter_verified_emails(sentinel, raw_emails).await;
 
-    HttpResponse::Ok().body(format!("Raw emails: {:?}", emails))
+    HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
 }
 
 async fn get_urls_from_google_searches(
