@@ -52,10 +52,11 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    // TODO: Extract founder names from the tags scraped
     let founders = extract_founder_names(raw_founders);
 
-    HttpResponse::Ok().body(format!("Founders: {:?}", founders))
+    let raw_emails = construct_emails(founders);
+
+    HttpResponse::Ok().body(format!("Raw emails: {:?}", raw_emails))
 }
 
 async fn get_urls_from_google_searches(
@@ -268,11 +269,45 @@ fn extract_founder_names(
         .collect()
 }
 
+fn construct_emails(domain_founders: Vec<DomainFounderQualified>) -> Vec<String> {
+    let mut emails: Vec<String> = vec![];
+
+    for df in domain_founders {
+        for name in df.names {
+            let name_pieces: Vec<&str> = name.split(" ").collect();
+            if name_pieces.len() == 2 {
+                let name_vec: Vec<&str> = name.split(" ").collect();
+                let first_name = name_vec.first().unwrap().to_lowercase();
+                let last_name = name_vec.get(1).unwrap().to_lowercase();
+
+                emails.push(format!("{}@{}", first_name, df.domain));
+                emails.push(format!("{}@{}", last_name, df.domain));
+                emails.push(format!("{}{}@{}", first_name, last_name, df.domain));
+                emails.push(format!("{}.{}@{}", first_name, last_name, df.domain));
+                emails.push(format!(
+                    "{}{}@{}",
+                    first_name,
+                    last_name.chars().next().unwrap(),
+                    df.domain
+                ));
+                emails.push(format!(
+                    "{}{}@{}",
+                    first_name.chars().next().unwrap(),
+                    last_name,
+                    df.domain
+                ));
+            }
+        }
+    }
+
+    emails
+}
+
 #[cfg(test)]
 mod tests {
     use crate::routes::lead_route::{
-        extract_domains_from_urls, extract_founder_names, filter_raw_urls, DomainFounderQualified,
-        FounderTagCandidate,
+        construct_emails, extract_domains_from_urls, extract_founder_names, filter_raw_urls,
+        DomainFounderQualified, FounderTagCandidate,
     };
 
     #[test]
@@ -434,6 +469,41 @@ mod tests {
         }];
 
         let results = extract_founder_names(candidates);
+        assert_eq!(results, expected)
+    }
+
+    #[test]
+    fn construct_emails_valid() {
+        let domain_founders = vec![DomainFounderQualified {
+            names: vec![
+                "Dan Go".to_string(),
+                "HÃ©lÃ¨ne de Troostembergh".to_string(),
+                "Samina Qureshi".to_string(),
+                "Wondercise Technology Corp.".to_string(),
+                "Veer Pushpak Gupta".to_string(),
+                "Deepak L. Bhatt".to_string(),
+                "WellTheory".to_string(),
+                "West Shell III".to_string(),
+            ],
+            domain: "verywellfit.com".to_string(),
+        }];
+
+        let expected = vec![
+            "dan@verywellfit.com".to_string(),
+            "go@verywellfit.com".to_string(),
+            "dango@verywellfit.com".to_string(),
+            "dan.go@verywellfit.com".to_string(),
+            "dang@verywellfit.com".to_string(),
+            "dgo@verywellfit.com".to_string(),
+            "samina@verywellfit.com".to_string(),
+            "qureshi@verywellfit.com".to_string(),
+            "saminaqureshi@verywellfit.com".to_string(),
+            "samina.qureshi@verywellfit.com".to_string(),
+            "saminaq@verywellfit.com".to_string(),
+            "squreshi@verywellfit.com".to_string(),
+        ];
+
+        let results = construct_emails(domain_founders);
         assert_eq!(results, expected)
     }
 }
