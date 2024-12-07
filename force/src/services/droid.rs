@@ -91,8 +91,8 @@ pub async fn make_new_driver() -> WebDriver {
     //     .unwrap();
 
     // http://chrome:4444/wd/hub
-    // http://localhost:58656
-    let new_driver = WebDriver::new("http://localhost:63364", caps)
+    // http://localhost:63364
+    let new_driver = WebDriver::new("http://chrome:4444/wd/hub", caps)
         .await
         .unwrap();
     new_driver.maximize_window().await.unwrap();
