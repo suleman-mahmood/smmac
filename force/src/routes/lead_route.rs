@@ -65,7 +65,8 @@ async fn get_leads_from_niche(
         }
     };
 
-    let raw_urls_result = get_urls_from_google_searches(&droid, product_search_queries).await;
+    let raw_urls_result =
+        get_urls_from_google_searches(&droid, &pool, product_search_queries).await;
     if let Err(error) = raw_urls_result {
         return HttpResponse::Ok().body(format!(
             "Got webdriver error from domain google searches: {:?}",
@@ -118,19 +119,33 @@ async fn get_leads_from_niche(
 
 async fn get_urls_from_google_searches(
     droid: &web::Data<Droid>,
+    pool: &PgPool,
     search_urls: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
-    let mut search_urls: Vec<String> = search_urls;
-    let mut domain_urls_list: Vec<String> = vec![];
+    let mut all_domain_urls_list: Vec<String> = vec![];
 
-    for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
-        let mut next_page_urls_list: Vec<String> = vec![];
+    for url in search_urls.into_iter() {
+        // Fetch domain urls for url, if exist don't search
+        if let Ok(candidate_urls) = lead_db::get_domain_candidate_urls_for_product(&url, pool).await
+        {
+            if !candidate_urls.is_empty() {
+                all_domain_urls_list.extend(candidate_urls);
+                continue;
+            }
+        };
 
-        for url in search_urls.iter() {
-            match extract_data_from_google_search(droid, url.to_string(), GoogleSearchType::Domain)
-                .await?
+        let mut current_url = url.clone();
+        let mut domain_urls_list: Vec<String> = vec![];
+
+        for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
+            match extract_data_from_google_search(
+                droid,
+                current_url.clone(),
+                GoogleSearchType::Domain,
+            )
+            .await?
             {
-                GoogleSearchResult::NotFound => continue,
+                GoogleSearchResult::NotFound => break,
                 GoogleSearchResult::Founders(_) => {
                     log::error!("Returning founders from domain google search")
                 }
@@ -139,17 +154,27 @@ async fn get_urls_from_google_searches(
                     next_page_url,
                 } => {
                     domain_urls_list.extend(domain_urls);
-                    if let Some(next_page_url) = next_page_url {
-                        next_page_urls_list.push(next_page_url);
+                    match next_page_url {
+                        Some(next_page_url) => current_url = next_page_url,
+                        None => break,
                     }
                 }
             }
         }
 
-        search_urls = next_page_urls_list;
+        all_domain_urls_list.extend(domain_urls_list.clone());
+
+        // Save domain entries
+        if let Err(e) = lead_db::insert_domain_candidate_urls(domain_urls_list, &url, pool).await {
+            log::error!(
+                "Error inserting domain candidate urls in db for url: {} and error: {:?}",
+                url,
+                e
+            )
+        }
     }
 
-    Ok(domain_urls_list)
+    Ok(all_domain_urls_list)
 }
 
 enum GoogleSearchType {

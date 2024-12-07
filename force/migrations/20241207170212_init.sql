@@ -7,7 +7,7 @@ create table product (
 	id uuid primary key,
 	niche text not null,
 	product text not null,
-	domain_boolean_search text not null,
+	domain_boolean_search text not null, -- Rename to url, make it unique
 	created_at timestamptz not null default now()
 );
 
@@ -16,7 +16,7 @@ create table domain (
 	product_id uuid not null references product(id),
 	domain_candidate_url text not null,
 	domain text,
-	founder_boolean_search text,
+	founder_boolean_search text, -- Rename to url
 	created_at timestamptz not null default now()
 );
 
