@@ -1,6 +1,6 @@
 use actix_web::{get, web, HttpResponse};
 use itertools::Itertools;
-use rand::{seq::SliceRandom, Rng};
+use rand::Rng;
 use serde::Deserialize;
 use sqlx::PgPool;
 use thirtyfour::{error::WebDriverError, By};
@@ -105,7 +105,10 @@ async fn get_urls_from_google_searches(
             match extract_data_from_google_search(droid, url.to_string(), GoogleSearchType::Domain)
                 .await?
             {
-                GoogleSearchResult::NotFound | GoogleSearchResult::Founders(_) => continue,
+                GoogleSearchResult::NotFound => continue,
+                GoogleSearchResult::Founders(_) => {
+                    log::error!("Returning founders from domain google search")
+                }
                 GoogleSearchResult::Domains {
                     domain_urls,
                     next_page_url,
@@ -272,7 +275,10 @@ async fn get_founders_from_google_searches(
         )
         .await?
         {
-            GoogleSearchResult::NotFound | GoogleSearchResult::Domains { .. } => continue,
+            GoogleSearchResult::NotFound => continue,
+            GoogleSearchResult::Domains { .. } => {
+                log::error!("Returning domains from founder google search")
+            }
             GoogleSearchResult::Founders(tag_candidate) => {
                 founder_candidate.push(tag_candidate);
             }
