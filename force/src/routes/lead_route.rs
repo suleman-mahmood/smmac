@@ -40,9 +40,14 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    let raw_urls = get_urls_from_google_searches(&droid, products)
-        .await
-        .unwrap();
+    let raw_urls_result = get_urls_from_google_searches(&droid, products).await;
+    if let Err(error) = raw_urls_result {
+        return HttpResponse::Ok().body(format!(
+            "Got webdriver error from domain google searches: {:?}",
+            error
+        ));
+    }
+    let raw_urls = raw_urls_result.unwrap();
 
     let urls = filter_raw_urls(raw_urls);
     let domains = extract_domains_from_urls(urls);
@@ -50,9 +55,14 @@ async fn get_leads_from_niche(
     // Remove duplicate domains
     let domains = domains.into_iter().unique().collect();
 
-    let raw_founders = get_founders_from_google_searches(&droid, domains)
-        .await
-        .unwrap();
+    let raw_founders_result = get_founders_from_google_searches(&droid, domains).await;
+    if let Err(error) = raw_founders_result {
+        return HttpResponse::Ok().body(format!(
+            "Got webdriver error from founder google searches: {:?}",
+            error
+        ));
+    }
+    let raw_founders = raw_founders_result.unwrap();
 
     let count = raw_founders
         .iter()
@@ -149,10 +159,26 @@ async fn extract_data_from_google_search(
     let mut drivers = droid.drivers.lock().await;
     let mut rand = rand::thread_rng();
     let mut retry_count = 0;
+    let mut captcha_blocked = false;
+
+    let mut driver_index = rand.gen_range(0..drivers.len());
+    let mut driver = drivers.get(driver_index).unwrap();
 
     while retry_count < NUM_CAPTCHA_RETRIES {
-        let driver_index = rand.gen_range(0..drivers.len());
-        let driver = drivers.get(driver_index).unwrap();
+        if captcha_blocked {
+            log::error!("Blocked by captcha on url: {}", url);
+
+            driver.clone().quit().await.unwrap();
+            drivers.remove(driver_index);
+
+            let new_driver = make_new_driver().await;
+            drivers.push(new_driver);
+
+            retry_count += 1;
+        }
+
+        driver_index = rand.gen_range(0..drivers.len());
+        driver = drivers.get(driver_index).unwrap();
         driver.goto(url.clone()).await?;
 
         match driver.find(By::XPath("//h3")).await {
@@ -167,13 +193,7 @@ async fn extract_data_from_google_search(
                     return Ok(GoogleSearchResult::NotFound);
                 }
                 // You have been blocked by captcha
-                Err(_) => {
-                    drivers.remove(driver_index);
-                    let new_driver = make_new_driver().await;
-                    drivers.push(new_driver);
-
-                    retry_count += 1;
-                }
+                Err(_) => captcha_blocked = true,
             },
             Ok(_) => match search_type {
                 GoogleSearchType::Domain => {
