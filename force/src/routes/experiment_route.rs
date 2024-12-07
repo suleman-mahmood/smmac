@@ -118,3 +118,30 @@ async fn check_ip_address(droid: web::Data<Droid>) -> HttpResponse {
 
     HttpResponse::Ok().body("Ok!")
 }
+
+#[derive(Deserialize)]
+struct AppScriptQuery {
+    key: String,
+}
+#[get("/fake-emails")]
+async fn get_fake_emails(query: web::Query<AppScriptQuery>) -> HttpResponse {
+    if query.key != "smmac-scraper-sandbox-api-key" {
+        return HttpResponse::Ok().json(["Invlid Api"]);
+    }
+
+    let emails = [
+        "dan@verywellfit.com",
+        "go@verywellfit.com",
+        "dango@verywellfit.com",
+        "dan.go@verywellfit.com",
+        "dang@verywellfit.com",
+        "dgo@verywellfit.com",
+        "samina@verywellfit.com",
+        "qureshi@verywellfit.com",
+        "saminaqureshi@verywellfit.com",
+        "samina.qureshi@verywellfit.com",
+        "saminaq@verywellfit.com",
+        "squreshi@verywellfit.com",
+    ];
+    HttpResponse::Ok().json(emails)
+}
