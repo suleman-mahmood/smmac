@@ -1,14 +1,15 @@
 use actix_web::{get, web, HttpResponse};
 use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use serde::Deserialize;
 use sqlx::PgPool;
 use thirtyfour::{error::WebDriverError, By};
 use url::Url;
 
-use crate::services::{Droid, OpenaiClient, Sentinel};
+use crate::services::{make_new_driver, Droid, OpenaiClient, Sentinel};
 
-const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1;
+const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
+const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -89,66 +90,153 @@ async fn get_urls_from_google_searches(
      ** Randomly select one browser from pool
      ** Scrape the link
      * */
-    let drivers = droid.drivers.lock().await;
 
     let mut search_urls: Vec<String> = products
         .iter()
         .map(|st| build_seach_url(st.to_string()))
         .collect();
 
-    let mut domain_urls: Vec<String> = vec![];
+    let mut domain_urls_list: Vec<String> = vec![];
 
     for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
-        let mut next_page_urls: Vec<String> = vec![];
+        let mut next_page_urls_list: Vec<String> = vec![];
 
         for url in search_urls.iter() {
-            let driver = drivers.choose(&mut rand::thread_rng()).unwrap();
-
-            driver.goto(url).await?;
-
-            // Check if no results found
-            if driver.find(By::XPath("//h3")).await.is_err() {
-                match driver
-                    .find(By::XPath("//div[contains(@class, 'card-section')]/ul"))
-                    .await
-                {
-                    Ok(_) => {
-                        log::error!("Found no results on url: {}", url);
-                        continue;
+            match extract_data_from_google_search(droid, url.to_string(), GoogleSearchType::Domain)
+                .await?
+            {
+                GoogleSearchResult::NotFound | GoogleSearchResult::Founders(_) => continue,
+                GoogleSearchResult::Domains {
+                    domain_urls,
+                    next_page_url,
+                } => {
+                    domain_urls_list.extend(domain_urls);
+                    if let Some(next_page_url) = next_page_url {
+                        next_page_urls_list.push(next_page_url);
                     }
-                    Err(_) => {
-                        // TODO: Implement this feature
-                        // You have been blocked, replace this browser and retry
-                        log::error!("Blocked on captcha on url: {}", url);
-                        continue;
-                    }
-                }
-            }
-
-            for a_tag in driver.find_all(By::XPath("//a")).await? {
-                let href_attribute = a_tag.attr("href").await?;
-                if let Some(href) = href_attribute {
-                    domain_urls.push(href);
-                }
-            }
-
-            log::info!(
-                "Commulative: Found {} urls, potential domains",
-                domain_urls.len(),
-            );
-
-            if let Ok(next_page_element) = driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await {
-                if let Some(href_attribute) = next_page_element.attr("href").await? {
-                    let next_url = format!("https://www.google.com{}", href_attribute);
-                    next_page_urls.push(next_url);
                 }
             }
         }
 
-        search_urls = next_page_urls;
+        search_urls = next_page_urls_list;
     }
 
-    Ok(domain_urls)
+    Ok(domain_urls_list)
+}
+
+enum GoogleSearchType {
+    Domain,
+    Founder(String),
+}
+
+enum GoogleSearchResult {
+    NotFound,
+    Domains {
+        domain_urls: Vec<String>,
+        next_page_url: Option<String>,
+    },
+    Founders(FounderTagCandidate),
+}
+
+async fn extract_data_from_google_search(
+    droid: &web::Data<Droid>,
+    url: String,
+    search_type: GoogleSearchType,
+) -> Result<GoogleSearchResult, WebDriverError> {
+    let mut drivers = droid.drivers.lock().await;
+    let mut rand = rand::thread_rng();
+    let mut retry_count = 0;
+
+    while retry_count < NUM_CAPTCHA_RETRIES {
+        let driver_index = rand.gen_range(0..drivers.len());
+        let driver = drivers.get(driver_index).unwrap();
+        driver.goto(url.clone()).await?;
+
+        match driver.find(By::XPath("//h3")).await {
+            // No h3 tag found
+            Err(_) => match driver
+                .find(By::XPath("//div[contains(@class, 'card-section')]/ul"))
+                .await
+            {
+                // There are no results on page
+                Ok(_) => {
+                    log::error!("Found no results on url: {}", url);
+                    return Ok(GoogleSearchResult::NotFound);
+                }
+                // You have been blocked by captcha
+                Err(_) => {
+                    drivers.remove(driver_index);
+                    let new_driver = make_new_driver().await;
+                    drivers.push(new_driver);
+
+                    retry_count += 1;
+                }
+            },
+            Ok(_) => match search_type {
+                GoogleSearchType::Domain => {
+                    let mut domain_urls: Vec<String> = vec![];
+                    let mut next_page_url = None;
+
+                    for a_tag in driver.find_all(By::XPath("//a")).await? {
+                        let href_attribute = a_tag.attr("href").await?;
+                        if let Some(href) = href_attribute {
+                            domain_urls.push(href);
+                        }
+                    }
+
+                    log::info!("Found {} urls | Potential domains", domain_urls.len(),);
+
+                    if let Ok(next_page_element) =
+                        driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await
+                    {
+                        if let Some(href_attribute) = next_page_element.attr("href").await? {
+                            let next_url = format!("https://www.google.com{}", href_attribute);
+                            next_page_url = Some(next_url);
+                        }
+                    }
+
+                    return Ok(GoogleSearchResult::Domains {
+                        domain_urls,
+                        next_page_url,
+                    });
+                }
+                GoogleSearchType::Founder(ref domain) => {
+                    let mut h3_tags = vec![];
+                    let mut span_tags = vec![];
+
+                    for h3_tag in driver.find_all(By::XPath("//h3")).await? {
+                        let text = h3_tag.text().await?;
+                        h3_tags.push(text);
+                    }
+
+                    for span_tag in driver
+                        .find_all(By::XPath("//h3/following-sibling::div/div/div/div[1]/span"))
+                        .await?
+                    {
+                        let text = span_tag.text().await?;
+                        span_tags.push(text);
+                    }
+
+                    log::info!(
+                        "Found {} h3_tags, {} span_tags | Potential founder names",
+                        h3_tags.len(),
+                        span_tags.len()
+                    );
+
+                    return Ok(GoogleSearchResult::Founders(FounderTagCandidate {
+                        h3_tags,
+                        span_tags,
+                        domain: domain.to_string(),
+                    }));
+                }
+            },
+        }
+    }
+
+    Err(WebDriverError::RequestFailed(format!(
+        "{} retries exceeded",
+        NUM_CAPTCHA_RETRIES
+    )))
 }
 
 #[derive(Debug, PartialEq)]
@@ -169,9 +257,6 @@ async fn get_founders_from_google_searches(
     domains: Vec<String>,
 ) -> Result<Vec<FounderTagCandidate>, WebDriverError> {
     // TODO: Add more build search url permutations as needed
-
-    let drivers = droid.drivers.lock().await;
-
     let search_urls: Vec<String> = domains
         .iter()
         .map(|d| build_founder_seach_url(d.to_string()))
@@ -180,42 +265,18 @@ async fn get_founders_from_google_searches(
     let mut founder_candidate: Vec<FounderTagCandidate> = vec![];
 
     for (url, domain) in search_urls.iter().zip(domains.iter()) {
-        let mut h3_tags = vec![];
-        let mut span_tags = vec![];
-        let driver = drivers.choose(&mut rand::thread_rng()).unwrap();
-
-        driver.goto(url).await?;
-
-        // Check if no results found
-        if driver.find(By::XPath("//h3")).await.is_err() {
-            log::error!("Found no results on url: {}", url);
-            continue;
-        }
-
-        for h3_tag in driver.find_all(By::XPath("//h3")).await? {
-            let text = h3_tag.text().await?;
-            h3_tags.push(text);
-        }
-
-        for span_tag in driver
-            .find_all(By::XPath("//h3/following-sibling::div/div/div/div[1]/span"))
-            .await?
+        match extract_data_from_google_search(
+            droid,
+            url.to_string(),
+            GoogleSearchType::Founder(domain.to_string()),
+        )
+        .await?
         {
-            let text = span_tag.text().await?;
-            span_tags.push(text);
+            GoogleSearchResult::NotFound | GoogleSearchResult::Domains { .. } => continue,
+            GoogleSearchResult::Founders(tag_candidate) => {
+                founder_candidate.push(tag_candidate);
+            }
         }
-
-        log::info!(
-            "Found {} h3_tags, {} span_tags, potential founder names",
-            h3_tags.len(),
-            span_tags.len()
-        );
-
-        founder_candidate.push(FounderTagCandidate {
-            h3_tags,
-            span_tags,
-            domain: domain.to_string(),
-        });
     }
 
     Ok(founder_candidate)
