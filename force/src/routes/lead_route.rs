@@ -6,7 +6,10 @@ use sqlx::PgPool;
 use thirtyfour::{error::WebDriverError, By};
 use url::Url;
 
-use crate::services::{make_new_driver, Droid, OpenaiClient, Sentinel};
+use crate::{
+    dal::lead_db,
+    services::{make_new_driver, Droid, OpenaiClient, Sentinel},
+};
 
 const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
 const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
@@ -35,12 +38,34 @@ async fn get_leads_from_niche(
     6. Return verified leads (emails)
     */
 
-    let products = openai_client
-        .get_boolean_searches_from_niche(&body.niche)
-        .await
-        .unwrap();
+    let product_search_queries = match lead_db::get_product_search_queries(&body.niche, &pool).await
+    {
+        Ok(search_queries) => search_queries,
+        Err(_) => {
+            let products = openai_client
+                .get_boolean_searches_from_niche(&body.niche)
+                .await
+                .unwrap();
 
-    let raw_urls_result = get_urls_from_google_searches(&droid, products).await;
+            let search_queries: Vec<String> = products
+                .iter()
+                .map(|p| build_seach_url(p.to_string()))
+                .collect();
+
+            lead_db::insert_niche_products(
+                products.clone(),
+                search_queries.clone(),
+                &body.niche,
+                &pool,
+            )
+            .await
+            .unwrap();
+
+            search_queries
+        }
+    };
+
+    let raw_urls_result = get_urls_from_google_searches(&droid, product_search_queries).await;
     if let Err(error) = raw_urls_result {
         return HttpResponse::Ok().body(format!(
             "Got webdriver error from domain google searches: {:?}",
@@ -93,19 +118,9 @@ async fn get_leads_from_niche(
 
 async fn get_urls_from_google_searches(
     droid: &web::Data<Droid>,
-    products: Vec<String>,
+    search_urls: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
-    /*
-     * For each url:
-     ** Randomly select one browser from pool
-     ** Scrape the link
-     * */
-
-    let mut search_urls: Vec<String> = products
-        .iter()
-        .map(|st| build_seach_url(st.to_string()))
-        .collect();
-
+    let mut search_urls: Vec<String> = search_urls;
     let mut domain_urls_list: Vec<String> = vec![];
 
     for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {

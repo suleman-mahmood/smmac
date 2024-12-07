@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into product\n                (id, niche, product, domain_boolean_search)\n            values\n                ($1, $2, $3, $4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b3b586961b7cca139045246cd156242dce5eb5ca687b1a705037369cb2f5842b"
+}
