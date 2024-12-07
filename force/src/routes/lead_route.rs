@@ -108,8 +108,21 @@ async fn get_urls_from_google_searches(
 
             // Check if no results found
             if driver.find(By::XPath("//h3")).await.is_err() {
-                log::error!("Found no results on url: {}", url);
-                continue;
+                match driver
+                    .find(By::XPath("//div[contains(@class, 'card-section')]/ul"))
+                    .await
+                {
+                    Ok(_) => {
+                        log::error!("Found no results on url: {}", url);
+                        continue;
+                    }
+                    Err(_) => {
+                        // TODO: Implement this feature
+                        // You have been blocked, replace this browser and retry
+                        log::error!("Blocked on captcha on url: {}", url);
+                        continue;
+                    }
+                }
             }
 
             for a_tag in driver.find_all(By::XPath("//a")).await? {
