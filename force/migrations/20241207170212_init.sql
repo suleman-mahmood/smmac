@@ -7,22 +7,23 @@ create table product (
 	id uuid primary key,
 	niche text not null,
 	product text not null,
-	domain_boolean_search text not null, -- Rename to url, make it unique
+	domain_boolean_search text not null, -- Rename to url, unique
 	created_at timestamptz not null default now()
 );
 
 create table domain (
 	id uuid primary key,
 	product_id uuid not null references product(id),
-	domain_candidate_url text not null,
-	domain text,
-	founder_boolean_search text, -- Rename to url
+	domain_candidate_url text not null, -- unique
+	domain text, -- duplicates
+	founder_boolean_search text, -- Rename to url, duplicates
 	created_at timestamptz not null default now()
 );
 
 create table founder (
 	id uuid primary key,
-	domain_id uuid not null references domain(id),
+	domain text, -- unique
+	-- domain_id uuid not null references domain(id), -- Remove this
 	element_content text not null,
 	element_type ElementType not null,
 	founder_name text,

@@ -73,15 +73,12 @@ async fn get_leads_from_niche(
             error
         ));
     }
-    let raw_urls = raw_urls_result.unwrap();
+    let domains = raw_urls_result.unwrap();
 
-    let urls = filter_raw_urls(raw_urls);
-    let domains = extract_domains_from_urls(urls);
-
-    // Remove duplicate domains
+    // Remove duplicate search urls
     let domains = domains.into_iter().unique().collect();
 
-    let raw_founders_result = get_founders_from_google_searches(&droid, domains).await;
+    let raw_founders_result = get_founders_from_google_searches(&droid, &pool, domains).await;
     if let Err(error) = raw_founders_result {
         return HttpResponse::Ok().body(format!(
             "Got webdriver error from founder google searches: {:?}",
@@ -90,9 +87,7 @@ async fn get_leads_from_niche(
     }
     let raw_founders = raw_founders_result.unwrap();
 
-    let count = raw_founders
-        .iter()
-        .fold(0, |acc, x| acc + x.span_tags.len() + x.h3_tags.len());
+    let count = raw_founders.iter().fold(0, |acc, x| acc + x.elements.len());
     log::info!(">>> >>> >>>");
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
@@ -122,14 +117,15 @@ async fn get_urls_from_google_searches(
     pool: &PgPool,
     search_urls: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
-    let mut all_domain_urls_list: Vec<String> = vec![];
+    // TODO: Dont' return urls, just save them to db
+    let mut all_founder_query_urls: Vec<String> = vec![];
 
     for url in search_urls.into_iter() {
         // Fetch domain urls for url, if exist don't search
         if let Ok(candidate_urls) = lead_db::get_domain_candidate_urls_for_product(&url, pool).await
         {
             if !candidate_urls.is_empty() {
-                all_domain_urls_list.extend(candidate_urls);
+                all_founder_query_urls.extend(candidate_urls);
                 continue;
             }
         };
@@ -147,7 +143,8 @@ async fn get_urls_from_google_searches(
             {
                 GoogleSearchResult::NotFound => break,
                 GoogleSearchResult::Founders(_) => {
-                    log::error!("Returning founders from domain google search")
+                    log::error!("Returning founders from domain google search");
+                    break;
                 }
                 GoogleSearchResult::Domains {
                     domain_urls,
@@ -162,10 +159,25 @@ async fn get_urls_from_google_searches(
             }
         }
 
-        all_domain_urls_list.extend(domain_urls_list.clone());
+        let domains: Vec<Option<String>> = domain_urls_list
+            .iter()
+            .map(|url| get_domain_from_url(url))
+            .collect();
+        let founders: Vec<Option<String>> = domains
+            .clone()
+            .into_iter()
+            .map(|dom| dom.map(build_founder_seach_url))
+            .collect();
+
+        // Remove None founders
+        let valid_founder_urls: Vec<String> = founders.clone().into_iter().flatten().collect();
+        all_founder_query_urls.extend(valid_founder_urls);
 
         // Save domain entries
-        if let Err(e) = lead_db::insert_domain_candidate_urls(domain_urls_list, &url, pool).await {
+        if let Err(e) =
+            lead_db::insert_domain_candidate_urls(domain_urls_list, domains, founders, &url, pool)
+                .await
+        {
             log::error!(
                 "Error inserting domain candidate urls in db for url: {} and error: {:?}",
                 url,
@@ -174,7 +186,7 @@ async fn get_urls_from_google_searches(
         }
     }
 
-    Ok(all_domain_urls_list)
+    Ok(all_founder_query_urls)
 }
 
 enum GoogleSearchType {
@@ -286,9 +298,13 @@ async fn extract_data_from_google_search(
                         span_tags.len()
                     );
 
+                    let elements = h3_tags
+                        .into_iter()
+                        .map(FounderElement::H3)
+                        .chain(span_tags.into_iter().map(FounderElement::Span))
+                        .collect();
                     return Ok(GoogleSearchResult::Founders(FounderTagCandidate {
-                        h3_tags,
-                        span_tags,
+                        elements,
                         domain: domain.to_string(),
                     }));
                 }
@@ -302,11 +318,16 @@ async fn extract_data_from_google_search(
     )))
 }
 
-#[derive(Debug, PartialEq)]
-struct FounderTagCandidate {
-    h3_tags: Vec<String>,
-    span_tags: Vec<String>,
-    domain: String,
+#[derive(Debug, PartialEq, Clone)]
+pub enum FounderElement {
+    Span(String),
+    H3(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FounderTagCandidate {
+    pub elements: Vec<FounderElement>,
+    pub domain: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -317,17 +338,22 @@ struct DomainFounderQualified {
 
 async fn get_founders_from_google_searches(
     droid: &web::Data<Droid>,
+    pool: &PgPool,
     domains: Vec<String>,
 ) -> Result<Vec<FounderTagCandidate>, WebDriverError> {
-    // TODO: Add more build search url permutations as needed
-    let search_urls: Vec<String> = domains
-        .iter()
-        .map(|d| build_founder_seach_url(d.to_string()))
-        .collect();
-
     let mut founder_candidate: Vec<FounderTagCandidate> = vec![];
 
-    for (url, domain) in search_urls.iter().zip(domains.iter()) {
+    for domain in domains {
+        let url = build_founder_seach_url(domain.clone());
+
+        if let Ok(Some(founder_tags)) = lead_db::get_founder_tags(&domain, pool).await {
+            founder_candidate.push(FounderTagCandidate {
+                elements: founder_tags,
+                domain,
+            });
+            continue;
+        }
+
         match extract_data_from_google_search(
             droid,
             url.to_string(),
@@ -340,7 +366,18 @@ async fn get_founders_from_google_searches(
                 log::error!("Returning domains from founder google search")
             }
             GoogleSearchResult::Founders(tag_candidate) => {
-                founder_candidate.push(tag_candidate);
+                founder_candidate.push(tag_candidate.clone());
+
+                // Save results to db
+                if let Err(e) = lead_db::insert_founders(tag_candidate.clone(), &domain, pool).await
+                {
+                    log::error!(
+                        "Error inserting domain founders in db for domain: {} and candidates: {:?} and error {:?}",
+                        domain,
+                        tag_candidate,
+                        e
+                    )
+                }
             }
         }
     }
@@ -354,39 +391,34 @@ fn build_seach_url(product: String) -> String {
 }
 
 fn build_founder_seach_url(domain: String) -> String {
+    // TODO: Add more build search url permutations as needed
     let boolean_query = format!(r#"site:linkedin.com "{}" AND "founder""#, domain);
     format!("https://www.google.com/search?q={}", boolean_query)
 }
 
-fn filter_raw_urls(urls: Vec<String>) -> Vec<String> {
-    urls.iter()
-        .filter(|u| match Url::parse(u) {
-            Ok(parsed_url) => match parsed_url.host_str() {
-                Some("support.google.com") => false,
-                Some("www.google.com") => false,
-                Some("accounts.google.com") => false,
-                Some("policies.google.com") => false,
-                Some("www.amazon.com") => false,
-                Some("") => false,
-                None => false,
-                Some(any_host) => !any_host.contains("google.com"),
-            },
-            Err(_) => false,
-        })
-        .map(|u| u.to_string())
-        .collect()
-}
-
-fn extract_domains_from_urls(urls: Vec<String>) -> Vec<String> {
-    urls.iter()
-        .map(|u| {
-            let host = Url::parse(u).unwrap().host_str().unwrap().to_string();
-            match host.strip_prefix("www.") {
-                Some(h) => h.to_string(),
-                None => host.to_string(),
+fn get_domain_from_url(url: &str) -> Option<String> {
+    match Url::parse(url) {
+        Ok(parsed_url) => match parsed_url.host_str() {
+            Some("support.google.com") => None,
+            Some("www.google.com") => None,
+            Some("accounts.google.com") => None,
+            Some("policies.google.com") => None,
+            Some("www.amazon.com") => None,
+            Some("") => None,
+            None => None,
+            Some(any_host) => {
+                if any_host.contains("google.com") {
+                    None
+                } else {
+                    match any_host.strip_prefix("www.") {
+                        Some(h) => Some(h.to_string()),
+                        None => Some(any_host.to_string()),
+                    }
+                }
             }
-        })
-        .collect()
+        },
+        Err(_) => None,
+    }
 }
 
 fn extract_founder_names(
@@ -395,43 +427,40 @@ fn extract_founder_names(
     founder_candidates
         .iter()
         .map(|fc| {
-            // let h3_tags = fc
-            //     .h3_tags
-            //     .iter()
-            //     .map(|t| {
-            //         todo!();
-            //     })
-            //     .collect();
-            let span_tags: Vec<String> = fc
-                .span_tags
+            let tags: Vec<String> = fc
+                .elements
                 .iter()
-                .filter_map(|t| match t.strip_prefix("LinkedIn Â· ") {
-                    Some(right_word) => {
-                        let right_word_original = right_word.to_string();
+                .filter_map(|t| match t {
+                    FounderElement::Span(t) => match t.strip_prefix("LinkedIn Â· ") {
+                        Some(right_word) => {
+                            let right_word_original = right_word.to_string();
 
-                        let result = match right_word.split(",").collect::<Vec<&str>>().as_slice() {
-                            [name, ..] => name.to_string(),
-                            _ => right_word_original,
-                        };
+                            let result =
+                                match right_word.split(",").collect::<Vec<&str>>().as_slice() {
+                                    [name, ..] => name.to_string(),
+                                    _ => right_word_original,
+                                };
 
-                        let result = match result.contains("Dr.") {
-                            true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
-                            false => result,
-                        };
-                        let result = match result.contains("Dr") {
-                            true => result.strip_prefix("Dr").unwrap().trim().to_string(),
-                            false => result,
-                        };
+                            let result = match result.contains("Dr.") {
+                                true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
+                                false => result,
+                            };
+                            let result = match result.contains("Dr") {
+                                true => result.strip_prefix("Dr").unwrap().trim().to_string(),
+                                false => result,
+                            };
 
-                        Some(result)
-                    }
-                    None => None,
+                            Some(result)
+                        }
+                        None => None,
+                    },
+                    FounderElement::H3(_) => None,
                 })
                 .collect();
 
-            let span_tags = span_tags.into_iter().unique().collect();
+            let tags = tags.into_iter().unique().collect();
             DomainFounderQualified {
-                names: span_tags,
+                names: tags,
                 domain: fc.domain.clone(),
             }
         })
@@ -487,12 +516,12 @@ async fn filter_verified_emails(sentinel: web::Data<Sentinel>, emails: Vec<Strin
 #[cfg(test)]
 mod tests {
     use crate::routes::lead_route::{
-        construct_emails, extract_domains_from_urls, extract_founder_names, filter_raw_urls,
-        DomainFounderQualified, FounderTagCandidate,
+        construct_emails, extract_founder_names, get_domain_from_url, DomainFounderQualified,
+        FounderElement, FounderTagCandidate,
     };
 
     #[test]
-    fn filter_raw_urls_invalid() {
+    fn get_domain_from_url_valid() {
         let raw_urls = [
             "https://support.google.com/websearch/answer/181196?hl=en-PK",
             "https://www.google.com/webhp?hl=en&sa=X&ved=0ahUKEwi2j67hto6KAxWkyDgGHXxuE0wQPAgI",
@@ -506,10 +535,10 @@ mod tests {
             "#",
             "https://www.amazon.com/Organic-Pure-Green-Tea-Bags/dp/B00FTAYNKE",
         ];
-        let raw_urls = raw_urls.iter().map(|u| u.to_string()).collect();
-        let results = filter_raw_urls(raw_urls);
-
-        assert!(results.is_empty())
+        for url in raw_urls {
+            let result = get_domain_from_url(url);
+            assert!(result.is_none());
+        }
     }
 
     #[test]
@@ -523,110 +552,109 @@ mod tests {
             "https://organicindia.com/collections/green-tea?srsltid=AfmBOopzdn4oOzfSwiaITNekbORRUG_MoVF67dULVE9IEHV6zlvZL0Qc",
             "https://www.traditionalmedicinals.com/products/green-tea-matcha?srsltid=AfmBOoqwv1CiL0XV_zNFmIWU1biT3S4xa-7KkOLzgXN4BkSCscGZFXzS",
         ];
-        let raw_urls: Vec<String> = raw_urls.iter().map(|u| u.to_string()).collect();
-        let results = filter_raw_urls(raw_urls.clone());
 
-        assert_eq!(results, raw_urls)
-    }
-
-    #[test]
-    fn extract_domains_valid() {
-        let urls = [
-            "https://www.znaturalfoods.com/products/green-tea-organic",
-            "https://dallosell.com/product_detail/organic-green-tea-bag",
-            "https://www.verywellfit.com/best-green-teas-5115813#:~:text=Certified%20organic%2C%20non%2DGMO%2C,Kyushu%20Island%20in%20southern%20Japan.",
-            "https://www.medicalnewstoday.com/articles/269538#:~:text=Research%20suggests%20it%20is%20safe,or%20interact%20with%20certain%20medications.",
-            "https://www.healthline.com/nutrition/top-10-evidence-based-health-benefits-of-green-tea#:~:text=A%202017%20research%20paper%20found,middle%2Daged%20and%20older%20adults.",
-            "https://organicindia.com/collections/green-tea?srsltid=AfmBOopzdn4oOzfSwiaITNekbORRUG_MoVF67dULVE9IEHV6zlvZL0Qc",
-            "https://www.traditionalmedicinals.com/products/green-tea-matcha?srsltid=AfmBOoqwv1CiL0XV_zNFmIWU1biT3S4xa-7KkOLzgXN4BkSCscGZFXzS",
+        let expected = [
+            "znaturalfoods.com",
+            "dallosell.com",
+            "verywellfit.com",
+            "medicalnewstoday.com",
+            "healthline.com",
+            "organicindia.com",
+            "traditionalmedicinals.com",
         ];
-        let urls: Vec<String> = urls.iter().map(|u| u.to_string()).collect();
-        let results = extract_domains_from_urls(urls);
-
-        assert_eq!(
-            results,
-            vec![
-                "znaturalfoods.com",
-                "dallosell.com",
-                "verywellfit.com",
-                "medicalnewstoday.com",
-                "healthline.com",
-                "organicindia.com",
-                "traditionalmedicinals.com",
-            ]
-        )
+        for (url, expected) in raw_urls.iter().zip(expected.iter()) {
+            let result = get_domain_from_url(url);
+            assert!(result.is_some());
+            assert_eq!(result.unwrap(), expected.to_string());
+        }
     }
 
     #[test]
     fn extract_founder_names_valid() {
         let candidates = vec![FounderTagCandidate {
-            h3_tags: vec![
-                // "Dan Go's Post".to_string(),
-                // "Eric Chuang on LinkedIn: Putting up the sign!".to_string(),
-                // "Dan Buettner's Post".to_string(),
-                // "Sarah Garone's Post".to_string(),
-                // "HÃ©lÃ¨ne de Troostembergh - Truly inspiring Tanguy Goretti".to_string(),
-                // "Samina Qureshi, RDN LD's Post".to_string(),
-                // "Tanguy Goretti's Post".to_string(),
-                // "Wondercise Technology Corp.".to_string(),
-                // "Dr. Gwilym Roddick's Post".to_string(),
-                // "Honor Whiteman - Senior Editorial Director - RVO Health".to_string(),
-                // "Tim Snaith - Newsletter Editor II - Medical News Today".to_string(),
-                // "Hasnain Sajjad on LinkedIn: #al".to_string(),
-                // "Dr Veer Pushpak Gupta - nhs #healthcare #unitedkingdom".to_string(),
-                // "Beth Frates, MD's Post".to_string(),
-                // "Deepak L. Bhatt, MD, MPH, MBA's Post".to_string(),
-                // "Dr. Ronald Klatz, MD, DO's Post".to_string(),
-                // "WellTheory".to_string(),
-                // "Uma Naidoo, MD".to_string(),
-                // "Dr William Bird MBE's Post".to_string(),
-                // "Georgette Smart - CEO E*HealthLine".to_string(),
-                // "David Kopp's Post".to_string(),
-                // "West Shell III - GOES (Global Outdoor Emergency Support)".to_string(),
-                // "Cathy Cassata - Freelance Writer - Healthline Networks, Inc.".to_string(),
-                // "Healthline Media".to_string(),
-                // "Health Line - Healthline Team Member".to_string(),
-                // "David Mills - Associate editor - healthline.com".to_string(),
-                // "Kevin Yoshiyama - Healthline Media".to_string(),
-                // "Cortland Dahl's Post".to_string(),
-                // "Kelsey Costa, MS, RDN's Post".to_string(),
-                // "babulal parashar - great innovation".to_string(),
-                // "Shravan Verma - Manager - PANI".to_string(),
-                // "anwar khan's Post".to_string(),
-                // "Christopher Dean - Sculptor Marble dreaming. collaborator ...".to_string(),
-                // "Manish Ambast's Post".to_string(),
-                // "Mark Balderman Highlove - Installation Specialist".to_string(),
-                // "100+ \"Partho Roy\" profiles".to_string(),
-                // "James Weisz on LinkedIn: #website #developer #film".to_string(),
-                // "Ravindra Prakash - Plant Manager - Shree Dhanwantri ...".to_string(),
-                // "Traditional Medicinals".to_string(),
-                // "Caitlin Landesberg on LinkedIn: Home".to_string(),
-                // "Traditional Medicinals".to_string(),
-                // "Joe Stanziano's Post".to_string(),
-                // "Traditional Medicinals | à¦²à¦¿à¦‚à¦•à¦¡à¦‡à¦¨".to_string(),
-                // "Kathy Avilla - Traditional Medicinals, Inc.".to_string(),
-                // "Ben Hindman's Post - sxsw".to_string(),
-                // "David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string(),
-            ],
-            span_tags: vec![
-                "LinkedIn Â· Dan Go".to_string(),
-                "LinkedIn Â· Dan Go".to_string(),
-                "LinkedIn Â· HÃ©lÃ¨ne de Troostembergh".to_string(),
-                "LinkedIn Â· Samina Qureshi, RDN LD".to_string(),
-                "LinkedIn Â· Wondercise Technology Corp.".to_string(),
-                "LinkedIn Â· Dr Veer Pushpak Gupta".to_string(),
-                "LinkedIn Â· Hasnain Sajjad".to_string(),
-                "LinkedIn Â· Deepak L. Bhatt, MD, MPH, MBA".to_string(),
-                "LinkedIn Â· Dr. Ronald Klatz, MD, DO".to_string(),
-                "LinkedIn Â· WellTheory".to_string(),
-                "LinkedIn Â· WellTheory".to_string(),
-                "LinkedIn Â· West Shell III".to_string(),
-                "LinkedIn Â· Cathy Cassata".to_string(),
-                "LinkedIn Â· Shravan Verma".to_string(),
-                "LinkedIn Â· anwar khan".to_string(),
-                "LinkedIn Â· Christopher Dean".to_string(),
-                "LinkedIn India".to_string(),
-                "LinkedIn".to_string(),
+            elements: vec![
+                FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
+                FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
+                FounderElement::Span("LinkedIn Â· HÃ©lÃ¨ne de Troostembergh".to_string()),
+                FounderElement::Span("LinkedIn Â· Samina Qureshi, RDN LD".to_string()),
+                FounderElement::Span("LinkedIn Â· Wondercise Technology Corp.".to_string()),
+                FounderElement::Span("LinkedIn Â· Dr Veer Pushpak Gupta".to_string()),
+                FounderElement::Span("LinkedIn Â· Hasnain Sajjad".to_string()),
+                FounderElement::Span("LinkedIn Â· Deepak L. Bhatt, MD, MPH, MBA".to_string()),
+                FounderElement::Span("LinkedIn Â· Dr. Ronald Klatz, MD, DO".to_string()),
+                FounderElement::Span("LinkedIn Â· WellTheory".to_string()),
+                FounderElement::Span("LinkedIn Â· WellTheory".to_string()),
+                FounderElement::Span("LinkedIn Â· West Shell III".to_string()),
+                FounderElement::Span("LinkedIn Â· Cathy Cassata".to_string()),
+                FounderElement::Span("LinkedIn Â· Shravan Verma".to_string()),
+                FounderElement::Span("LinkedIn Â· anwar khan".to_string()),
+                FounderElement::Span("LinkedIn Â· Christopher Dean".to_string()),
+                FounderElement::Span("LinkedIn India".to_string()),
+                FounderElement::Span("LinkedIn".to_string()),
+                FounderElement::H3("Dan Go's Post".to_string()),
+                FounderElement::H3("Eric Chuang on LinkedIn: Putting up the sign!".to_string()),
+                FounderElement::H3("Dan Buettner's Post".to_string()),
+                FounderElement::H3("Sarah Garone's Post".to_string()),
+                FounderElement::H3(
+                    "HÃ©lÃ¨ne de Troostembergh - Truly inspiring Tanguy Goretti".to_string(),
+                ),
+                FounderElement::H3("Samina Qureshi, RDN LD's Post".to_string()),
+                FounderElement::H3("Tanguy Goretti's Post".to_string()),
+                FounderElement::H3("Wondercise Technology Corp.".to_string()),
+                FounderElement::H3("Dr. Gwilym Roddick's Post".to_string()),
+                FounderElement::H3(
+                    "Honor Whiteman - Senior Editorial Director - RVO Health".to_string(),
+                ),
+                FounderElement::H3(
+                    "Tim Snaith - Newsletter Editor II - Medical News Today".to_string(),
+                ),
+                FounderElement::H3("Hasnain Sajjad on LinkedIn: #al".to_string()),
+                FounderElement::H3(
+                    "Dr Veer Pushpak Gupta - nhs #healthcare #unitedkingdom".to_string(),
+                ),
+                FounderElement::H3("Beth Frates, MD's Post".to_string()),
+                FounderElement::H3("Deepak L. Bhatt, MD, MPH, MBA's Post".to_string()),
+                FounderElement::H3("Dr. Ronald Klatz, MD, DO's Post".to_string()),
+                FounderElement::H3("WellTheory".to_string()),
+                FounderElement::H3("Uma Naidoo, MD".to_string()),
+                FounderElement::H3("Dr William Bird MBE's Post".to_string()),
+                FounderElement::H3("Georgette Smart - CEO E*HealthLine".to_string()),
+                FounderElement::H3("David Kopp's Post".to_string()),
+                FounderElement::H3(
+                    "West Shell III - GOES (Global Outdoor Emergency Support)".to_string(),
+                ),
+                FounderElement::H3(
+                    "Cathy Cassata - Freelance Writer - Healthline Networks, Inc.".to_string(),
+                ),
+                FounderElement::H3("Healthline Media".to_string()),
+                FounderElement::H3("Health Line - Healthline Team Member".to_string()),
+                FounderElement::H3("David Mills - Associate editor - healthline.com".to_string()),
+                FounderElement::H3("Kevin Yoshiyama - Healthline Media".to_string()),
+                FounderElement::H3("Cortland Dahl's Post".to_string()),
+                FounderElement::H3("Kelsey Costa, MS, RDN's Post".to_string()),
+                FounderElement::H3("babulal parashar - great innovation".to_string()),
+                FounderElement::H3("Shravan Verma - Manager - PANI".to_string()),
+                FounderElement::H3("anwar khan's Post".to_string()),
+                FounderElement::H3(
+                    "Christopher Dean - Sculptor Marble dreaming. collaborator ...".to_string(),
+                ),
+                FounderElement::H3("Manish Ambast's Post".to_string()),
+                FounderElement::H3("Mark Balderman Highlove - Installation Specialist".to_string()),
+                FounderElement::H3("100+ \"Partho Roy\" profiles".to_string()),
+                FounderElement::H3(
+                    "James Weisz on LinkedIn: #website #developer #film".to_string(),
+                ),
+                FounderElement::H3(
+                    "Ravindra Prakash - Plant Manager - Shree Dhanwantri ...".to_string(),
+                ),
+                FounderElement::H3("Traditional Medicinals".to_string()),
+                FounderElement::H3("Caitlin Landesberg on LinkedIn: Home".to_string()),
+                FounderElement::H3("Traditional Medicinals".to_string()),
+                FounderElement::H3("Joe Stanziano's Post".to_string()),
+                FounderElement::H3("Traditional Medicinals | à¦²à¦¿à¦‚à¦•à¦¡à¦‡à¦¨".to_string()),
+                FounderElement::H3("Kathy Avilla - Traditional Medicinals, Inc.".to_string()),
+                FounderElement::H3("Ben Hindman's Post - sxsw".to_string()),
+                FounderElement::H3("David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string()),
             ],
             domain: "verywellfit.com".to_string(),
         }];
