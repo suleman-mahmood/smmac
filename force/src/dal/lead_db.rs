@@ -11,7 +11,7 @@ pub async fn get_product_search_queries(
     sqlx::query_scalar!(
         r#"
         select
-            domain_boolean_search
+            domain_search_url
         from
             product
         where
@@ -33,7 +33,7 @@ pub async fn insert_niche_products(
         sqlx::query!(
             r#"
             insert into product
-                (id, niche, product, domain_boolean_search)
+                (id, niche, product, domain_search_url)
             values
                 ($1, $2, $3, $4)
             "#,
@@ -48,24 +48,23 @@ pub async fn insert_niche_products(
     Ok(())
 }
 
-pub async fn get_domain_candidate_urls_for_product(
-    product_url: &str,
-    pool: &PgPool,
-) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar!(
+pub async fn get_domains(product_url: &str, pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
+    let domains = sqlx::query_scalar!(
         r#"
         select
-            d.domain_candidate_url
+            distinct d.domain
         from
             domain d
             join product p on p.id = d.product_id
         where
-            p.domain_boolean_search = $1
+            p.domain_search_url = $1
         "#,
         product_url,
     )
     .fetch_all(pool)
-    .await
+    .await?;
+
+    Ok(domains.into_iter().flatten().collect())
 }
 
 pub async fn insert_domain_candidate_urls(
@@ -77,7 +76,7 @@ pub async fn insert_domain_candidate_urls(
 ) -> Result<(), sqlx::Error> {
     let product_id = sqlx::query_scalar!(
         r#"
-        select id from product where domain_boolean_search = $1
+        select id from product where domain_search_url = $1
         "#,
         search_url
     )
@@ -88,6 +87,7 @@ pub async fn insert_domain_candidate_urls(
         log::error!("No row found in product for url: {}", search_url);
         return Ok(());
     }
+    let product_id = product_id.unwrap();
 
     for ((domain_url, dom), foun) in domain_urls_list
         .iter()
@@ -97,7 +97,7 @@ pub async fn insert_domain_candidate_urls(
         sqlx::query!(
             r#"
             insert into domain
-                (id, product_id, domain_candidate_url, domain, founder_boolean_search)
+                (id, product_id, domain_candidate_url, domain, founder_search_url)
             values
                 ($1, $2, $3, $4, $5)
             "#,

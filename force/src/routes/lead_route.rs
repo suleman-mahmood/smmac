@@ -38,8 +38,7 @@ async fn get_leads_from_niche(
     6. Return verified leads (emails)
     */
 
-    let product_search_queries = match lead_db::get_product_search_queries(&body.niche, &pool).await
-    {
+    let domain_search_urls = match lead_db::get_product_search_queries(&body.niche, &pool).await {
         Ok(search_queries) => search_queries,
         Err(_) => {
             let products = openai_client
@@ -65,18 +64,14 @@ async fn get_leads_from_niche(
         }
     };
 
-    let raw_urls_result =
-        get_urls_from_google_searches(&droid, &pool, product_search_queries).await;
-    if let Err(error) = raw_urls_result {
+    let domains_result = get_urls_from_google_searches(&droid, &pool, domain_search_urls).await;
+    if let Err(error) = domains_result {
         return HttpResponse::Ok().body(format!(
             "Got webdriver error from domain google searches: {:?}",
             error
         ));
     }
-    let domains = raw_urls_result.unwrap();
-
-    // Remove duplicate search urls
-    let domains = domains.into_iter().unique().collect();
+    let domains = domains_result.unwrap();
 
     let raw_founders_result = get_founders_from_google_searches(&droid, &pool, domains).await;
     if let Err(error) = raw_founders_result {
@@ -88,6 +83,7 @@ async fn get_leads_from_niche(
     let raw_founders = raw_founders_result.unwrap();
 
     let count = raw_founders.iter().fold(0, |acc, x| acc + x.elements.len());
+
     log::info!(">>> >>> >>>");
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
@@ -118,14 +114,13 @@ async fn get_urls_from_google_searches(
     search_urls: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
     // TODO: Dont' return urls, just save them to db
-    let mut all_founder_query_urls: Vec<String> = vec![];
+    let mut all_domains: Vec<String> = vec![];
 
     for url in search_urls.into_iter() {
         // Fetch domain urls for url, if exist don't search
-        if let Ok(candidate_urls) = lead_db::get_domain_candidate_urls_for_product(&url, pool).await
-        {
-            if !candidate_urls.is_empty() {
-                all_founder_query_urls.extend(candidate_urls);
+        if let Ok(domains) = lead_db::get_domains(&url, pool).await {
+            if !domains.is_empty() {
+                all_domains.extend(domains);
                 continue;
             }
         };
@@ -163,20 +158,25 @@ async fn get_urls_from_google_searches(
             .iter()
             .map(|url| get_domain_from_url(url))
             .collect();
-        let founders: Vec<Option<String>> = domains
+        let founder_search_urls: Vec<Option<String>> = domains
             .clone()
             .into_iter()
             .map(|dom| dom.map(build_founder_seach_url))
             .collect();
 
         // Remove None founders
-        let valid_founder_urls: Vec<String> = founders.clone().into_iter().flatten().collect();
-        all_founder_query_urls.extend(valid_founder_urls);
+        let valid_domains: Vec<String> = domains.clone().into_iter().flatten().collect();
+        all_domains.extend(valid_domains);
 
         // Save domain entries
-        if let Err(e) =
-            lead_db::insert_domain_candidate_urls(domain_urls_list, domains, founders, &url, pool)
-                .await
+        if let Err(e) = lead_db::insert_domain_candidate_urls(
+            domain_urls_list,
+            domains,
+            founder_search_urls,
+            &url,
+            pool,
+        )
+        .await
         {
             log::error!(
                 "Error inserting domain candidate urls in db for url: {} and error: {:?}",
@@ -186,7 +186,9 @@ async fn get_urls_from_google_searches(
         }
     }
 
-    Ok(all_founder_query_urls)
+    // Remove duplicate search urls
+    let all_domains = all_domains.into_iter().unique().collect();
+    Ok(all_domains)
 }
 
 enum GoogleSearchType {
@@ -344,8 +346,6 @@ async fn get_founders_from_google_searches(
     let mut founder_candidate: Vec<FounderTagCandidate> = vec![];
 
     for domain in domains {
-        let url = build_founder_seach_url(domain.clone());
-
         if let Ok(Some(founder_tags)) = lead_db::get_founder_tags(&domain, pool).await {
             founder_candidate.push(FounderTagCandidate {
                 elements: founder_tags,
@@ -353,6 +353,9 @@ async fn get_founders_from_google_searches(
             });
             continue;
         }
+
+        // TODO: Fetch url from db instead
+        let url = build_founder_seach_url(domain.clone());
 
         match extract_data_from_google_search(
             droid,
@@ -363,12 +366,14 @@ async fn get_founders_from_google_searches(
         {
             GoogleSearchResult::NotFound => continue,
             GoogleSearchResult::Domains { .. } => {
-                log::error!("Returning domains from founder google search")
+                log::error!("Returning domains from founder google search");
+                continue;
             }
             GoogleSearchResult::Founders(tag_candidate) => {
                 founder_candidate.push(tag_candidate.clone());
 
                 // Save results to db
+                // TODO: insert founder_name as well
                 if let Err(e) = lead_db::insert_founders(tag_candidate.clone(), &domain, pool).await
                 {
                     log::error!(
