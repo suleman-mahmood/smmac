@@ -38,31 +38,7 @@ async fn get_leads_from_niche(
     6. Return verified leads (emails)
     */
 
-    let domain_search_urls = match lead_db::get_product_search_queries(&body.niche, &pool).await {
-        Ok(search_queries) => search_queries,
-        Err(_) => {
-            let products = openai_client
-                .get_boolean_searches_from_niche(&body.niche)
-                .await
-                .unwrap();
-
-            let search_queries: Vec<String> = products
-                .iter()
-                .map(|p| build_seach_url(p.to_string()))
-                .collect();
-
-            lead_db::insert_niche_products(
-                products.clone(),
-                search_queries.clone(),
-                &body.niche,
-                &pool,
-            )
-            .await
-            .unwrap();
-
-            search_queries
-        }
-    };
+    let domain_search_urls = get_product_search_queries(&pool, &openai_client, &body.niche).await;
 
     let domains_result = get_urls_from_google_searches(&droid, &pool, domain_search_urls).await;
     if let Err(error) = domains_result {
@@ -101,6 +77,34 @@ async fn get_leads_from_niche(
 
     // HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
     HttpResponse::Ok().json(raw_emails)
+}
+
+async fn get_product_search_queries(
+    pool: &PgPool,
+    openai_client: &OpenaiClient,
+    niche: &str,
+) -> Vec<String> {
+    if let Ok(search_queries) = lead_db::get_product_search_queries(niche, pool).await {
+        if !search_queries.is_empty() {
+            return search_queries;
+        }
+    }
+
+    let products = openai_client
+        .get_boolean_searches_from_niche(niche)
+        .await
+        .unwrap();
+
+    let search_queries: Vec<String> = products
+        .iter()
+        .map(|p| build_seach_url(p.to_string()))
+        .collect();
+
+    lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool)
+        .await
+        .unwrap();
+
+    search_queries
 }
 
 async fn get_urls_from_google_searches(
