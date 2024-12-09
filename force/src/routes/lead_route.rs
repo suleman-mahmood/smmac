@@ -65,7 +65,7 @@ async fn get_leads_from_niche(
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
 
-    let raw_emails = construct_emails(&pool, domains.clone()).await.unwrap();
+    let raw_emails = construct_emails(&pool, domains).await.unwrap();
 
     // TODO: Verify all email permutations
 
@@ -112,7 +112,7 @@ async fn get_urls_from_google_searches(
     pool: &PgPool,
     search_urls: Vec<String>,
 ) -> Result<Vec<String>, WebDriverError> {
-    // TODO: Dont' return urls, just save them to db
+    // TODO: Dont' return domains, just save them to db
     let mut all_domains: Vec<String> = vec![];
 
     for url in search_urls.into_iter() {
@@ -421,6 +421,7 @@ fn get_domain_from_url(url: &str) -> Option<String> {
     }
 }
 
+// TODO: Pass list of elements instead
 fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<String>> {
     founder_candidate
         .elements
@@ -488,7 +489,7 @@ async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Result<Vec<Str
         all_emails.extend(emails_db.iter().map(|e| e.email.clone()));
 
         // Save emails in db
-        if let Err(err) = lead_db::add_emails(emails_db.clone(), pool).await {
+        if let Err(err) = lead_db::insert_emails(emails_db.clone(), pool).await {
             log::error!(
                 "Error {:?} inserting emails permutations into db for input: {:?}",
                 err,

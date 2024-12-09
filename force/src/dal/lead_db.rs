@@ -249,7 +249,7 @@ enum EmailVerifiedStatus {
     Verified,
     Invalid,
 }
-pub async fn add_emails(
+pub async fn insert_emails(
     founder_domain_emails: Vec<FounderDomainEmail>,
     pool: &PgPool,
 ) -> Result<(), sqlx::Error> {
