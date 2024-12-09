@@ -89,6 +89,9 @@ async fn get_leads_from_niche(
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
 
+    // TODO: Construct and save all email permuations
+    // TODO: Verify all email permutations
+
     // let founders = extract_founder_names(raw_founders);
     //
     // let count = founders.iter().fold(0, |acc, x| acc + x.names.len());
@@ -329,7 +332,7 @@ pub enum FounderElement {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FounderTagCandidate {
-    pub elements: Vec<FounderElement>,
+    pub elements: Vec<FounderElement>, // TODO: Change this to return vec of names
     pub domain: String,
 }
 
