@@ -1,9 +1,12 @@
 use actix_web::{get, web, HttpResponse};
 use rand::seq::SliceRandom;
 use serde::Deserialize;
+use sqlx::PgPool;
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 
 use crate::services::{Droid, OpenaiClient, Sentinel};
+
+use super::lead_route;
 
 #[derive(Deserialize)]
 struct NicheQuery {
@@ -144,4 +147,47 @@ async fn get_fake_emails(query: web::Query<AppScriptQuery>) -> HttpResponse {
         "squreshi@verywellfit.com",
     ];
     HttpResponse::Ok().json(emails)
+}
+
+#[get("/re-calculate-domains")]
+async fn extract_domain_from_candidate_url(pool: web::Data<PgPool>) -> HttpResponse {
+    let candidate_urls = sqlx::query_scalar!("select domain_candidate_url from domain")
+        .fetch_all(pool.as_ref())
+        .await
+        .unwrap();
+
+    let domains: Vec<Option<String>> = candidate_urls
+        .iter()
+        .map(|url| lead_route::get_domain_from_url(url))
+        .collect();
+
+    let founder_search_urls: Vec<Option<String>> = domains
+        .clone()
+        .into_iter()
+        .map(|dom| dom.map(lead_route::build_founder_seach_url))
+        .collect();
+
+    for ((url, dom), new_url) in candidate_urls
+        .into_iter()
+        .zip(domains.into_iter())
+        .zip(founder_search_urls.into_iter())
+    {
+        sqlx::query!(
+            r#"
+            update domain set
+                domain = $2,
+                founder_search_url = $3
+            where
+                domain_candidate_url = $1
+            "#,
+            url,
+            dom,
+            new_url,
+        )
+        .execute(pool.as_ref())
+        .await
+        .unwrap();
+    }
+
+    HttpResponse::Ok().body("Done!")
 }

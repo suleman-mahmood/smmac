@@ -38,7 +38,8 @@ pub fn run(
                     .service(experiment_route::verify_emails)
                     .service(experiment_route::check_user_agent)
                     .service(experiment_route::check_ip_address)
-                    .service(experiment_route::get_fake_emails),
+                    .service(experiment_route::get_fake_emails)
+                    .service(experiment_route::extract_domain_from_candidate_url),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())

@@ -110,7 +110,7 @@ pub async fn insert_domain_candidate_urls(
             foun.clone()
         )
         .execute(pool)
-        .await?;
+        .await?; // TODO: Ignore error silently
     }
     Ok(())
 }

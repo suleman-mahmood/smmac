@@ -50,6 +50,12 @@ async fn get_leads_from_niche(
     // These domains are unique
     let domains = domains_result.unwrap();
 
+    log::info!(
+        "Got {} unique domains for niche {}",
+        domains.len(),
+        &body.niche
+    );
+
     let raw_founders_result =
         get_founders_from_google_searches(&droid, &pool, domains.clone()).await;
     if let Err(error) = raw_founders_result {
@@ -390,34 +396,37 @@ fn build_seach_url(product: String) -> String {
     format!("https://www.google.com/search?q={}", boolean_query)
 }
 
-fn build_founder_seach_url(domain: String) -> String {
+pub fn build_founder_seach_url(domain: String) -> String {
     // TODO: Add more build search url permutations as needed
     let boolean_query = format!(r#"site:linkedin.com "{}" AND "founder""#, domain);
     format!("https://www.google.com/search?q={}", boolean_query)
 }
 
-fn get_domain_from_url(url: &str) -> Option<String> {
-    match Url::parse(url) {
-        Ok(parsed_url) => match parsed_url.host_str() {
-            Some("support.google.com") => None,
-            Some("www.google.com") => None,
-            Some("accounts.google.com") => None,
-            Some("policies.google.com") => None,
-            Some("www.amazon.com") => None,
-            Some("") => None,
-            None => None,
-            Some(any_host) => {
-                if any_host.contains("google.com") {
-                    None
-                } else {
-                    match any_host.strip_prefix("www.") {
-                        Some(h) => Some(h.to_string()),
-                        None => Some(any_host.to_string()),
+pub fn get_domain_from_url(url: &str) -> Option<String> {
+    match url.strip_prefix("/url?q=") {
+        Some(url) => match Url::parse(url) {
+            Ok(parsed_url) => match parsed_url.host_str() {
+                Some("support.google.com") => None,
+                Some("www.google.com") => None,
+                Some("accounts.google.com") => None,
+                Some("policies.google.com") => None,
+                Some("www.amazon.com") => None,
+                Some("") => None,
+                None => None,
+                Some(any_host) => {
+                    if any_host.contains("google.com") {
+                        None
+                    } else {
+                        match any_host.strip_prefix("www.") {
+                            Some(h) => Some(h.to_string()),
+                            None => Some(any_host.to_string()),
+                        }
                     }
                 }
-            }
+            },
+            Err(_) => None,
         },
-        Err(_) => None,
+        None => None,
     }
 }
 
