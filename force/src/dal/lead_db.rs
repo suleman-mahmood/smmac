@@ -2,7 +2,9 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::routes::lead_route::{FounderElement, FounderTagCandidate};
+use crate::routes::lead_route::{
+    FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate,
+};
 
 pub async fn get_product_search_queries(
     niche: &str,
@@ -186,4 +188,25 @@ pub async fn insert_founders(
         .await?;
     }
     Ok(())
+}
+
+pub async fn get_founder_domains(
+    domains: Vec<String>,
+    pool: &PgPool,
+) -> Result<Vec<FounderDomain>, sqlx::Error> {
+    todo!()
+}
+
+pub async fn get_raw_emails(
+    founder_domain: FounderDomain,
+    pool: &PgPool,
+) -> Result<Vec<String>, sqlx::Error> {
+    todo!()
+}
+
+pub async fn add_emails(
+    founder_domain_emails: Vec<FounderDomainEmail>,
+    pool: &PgPool,
+) -> Result<Vec<FounderDomain>, sqlx::Error> {
+    todo!()
 }

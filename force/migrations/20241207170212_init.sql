@@ -25,7 +25,7 @@ create table founder (
 	domain text, -- duplicates
 	element_content text not null,
 	element_type ElementType not null,
-	founder_name text,
+	founder_name text, -- duplicates
 	created_at timestamptz not null default now()
 	-- make founder_name and domain unique
 );

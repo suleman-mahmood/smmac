@@ -71,6 +71,7 @@ async fn get_leads_from_niche(
             error
         ));
     }
+    // These domains are unique
     let domains = domains_result.unwrap();
 
     let raw_founders_result =
@@ -82,25 +83,15 @@ async fn get_leads_from_niche(
         ));
     }
     let raw_founders = raw_founders_result.unwrap();
-
     let count = raw_founders.iter().fold(0, |acc, x| acc + x.elements.len());
 
     log::info!(">>> >>> >>>");
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
 
-    // TODO: Construct and save all email permuations
+    let raw_emails = construct_emails(&pool, domains.clone()).await.unwrap();
+
     // TODO: Verify all email permutations
-
-    // let founders = extract_founder_names(raw_founders);
-    //
-    // let count = founders.iter().fold(0, |acc, x| acc + x.names.len());
-
-    // log::info!(">>> >>> >>>");
-    // log::info!("Total Qualified Founders: {}", count);
-    // log::info!(">>> >>> >>>");
-
-    // let raw_emails = construct_emails(founders);
 
     // log::info!(">>> >>> >>>");
     // log::info!("Constructed emails: {}", raw_emails.len());
@@ -109,7 +100,7 @@ async fn get_leads_from_niche(
     // let emails = filter_verified_emails(sentinel, raw_emails).await;
 
     // HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
-    HttpResponse::Ok().json(domains)
+    HttpResponse::Ok().json(raw_emails)
 }
 
 async fn get_urls_from_google_searches(
@@ -168,7 +159,7 @@ async fn get_urls_from_google_searches(
             .map(|dom| dom.map(build_founder_seach_url))
             .collect();
 
-        // Remove None founders
+        // Remove None domains
         let valid_domains: Vec<String> = domains.clone().into_iter().flatten().collect();
         all_domains.extend(valid_domains);
 
@@ -190,7 +181,7 @@ async fn get_urls_from_google_searches(
         }
     }
 
-    // Remove duplicate search urls
+    // Remove duplicate domains
     let all_domains = all_domains.into_iter().unique().collect();
     Ok(all_domains)
 }
@@ -336,12 +327,6 @@ pub struct FounderTagCandidate {
     pub domain: String,
 }
 
-#[derive(Debug, PartialEq)]
-struct DomainFounderQualified {
-    names: Vec<String>,
-    domain: String,
-}
-
 async fn get_founders_from_google_searches(
     droid: &web::Data<Droid>,
     pool: &PgPool,
@@ -464,38 +449,105 @@ fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<S
         .collect()
 }
 
-fn construct_emails(domain_founders: Vec<DomainFounderQualified>) -> Vec<String> {
-    let mut emails: Vec<String> = vec![];
+#[derive(Clone)]
+pub struct FounderDomain {
+    name: String,
+    domain: String,
+}
 
-    for df in domain_founders {
-        for name in df.names {
-            let name_pieces: Vec<&str> = name.split(" ").collect();
-            if name_pieces.len() == 2 {
-                let name_vec: Vec<&str> = name.split(" ").collect();
-                let first_name = name_vec.first().unwrap().to_lowercase();
-                let last_name = name_vec.get(1).unwrap().to_lowercase();
+#[derive(Debug, Clone, PartialEq)]
+pub struct FounderDomainEmail {
+    pub name: String,
+    pub domain: String,
+    pub email: String,
+}
 
-                emails.push(format!("{}@{}", first_name, df.domain));
-                emails.push(format!("{}@{}", last_name, df.domain));
-                emails.push(format!("{}{}@{}", first_name, last_name, df.domain));
-                emails.push(format!("{}.{}@{}", first_name, last_name, df.domain));
-                emails.push(format!(
-                    "{}{}@{}",
-                    first_name,
-                    last_name.chars().next().unwrap(),
-                    df.domain
-                ));
-                emails.push(format!(
-                    "{}{}@{}",
-                    first_name.chars().next().unwrap(),
-                    last_name,
-                    df.domain
-                ));
+async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Result<Vec<String>, String> {
+    let founder_domains = lead_db::get_founder_domains(domains, pool).await.unwrap();
+
+    let mut all_emails: Vec<String> = vec![];
+
+    for fd in founder_domains {
+        // Verify if already run
+        if let Ok(emails) = lead_db::get_raw_emails(fd.clone(), pool).await {
+            if !emails.is_empty() {
+                all_emails.extend(emails);
+                continue;
             }
+        }
+
+        let emails_db = get_email_permutations(&fd.name, &fd.domain);
+        if emails_db.is_empty() {
+            continue;
+        }
+
+        all_emails.extend(emails_db.iter().map(|e| e.email.clone()));
+
+        // Save emails in db
+        if let Err(err) = lead_db::add_emails(emails_db.clone(), pool).await {
+            log::error!(
+                "Error {:?} inserting emails permutations into db for input: {:?}",
+                err,
+                emails_db
+            )
         }
     }
 
-    emails
+    Ok(all_emails)
+}
+
+fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
+    let mut emails_db: Vec<FounderDomainEmail> = vec![];
+
+    let name_pieces: Vec<&str> = name.split(" ").collect();
+    if name_pieces.len() == 2 {
+        let name_vec: Vec<&str> = name.split(" ").collect();
+        let first_name = name_vec.first().unwrap().to_lowercase();
+        let last_name = name_vec.get(1).unwrap().to_lowercase();
+
+        emails_db.push(FounderDomainEmail {
+            email: format!("{}@{}", first_name, domain),
+            name: name.to_string(),
+            domain: domain.to_string(),
+        });
+        emails_db.push(FounderDomainEmail {
+            email: format!("{}@{}", last_name, domain),
+            name: name.to_string(),
+            domain: domain.to_string(),
+        });
+        emails_db.push(FounderDomainEmail {
+            email: format!("{}{}@{}", first_name, last_name, domain),
+            name: name.to_string(),
+            domain: domain.to_string(),
+        });
+        emails_db.push(FounderDomainEmail {
+            email: format!("{}.{}@{}", first_name, last_name, domain),
+            name: name.to_string(),
+            domain: domain.to_string(),
+        });
+        emails_db.push(FounderDomainEmail {
+            email: format!(
+                "{}{}@{}",
+                first_name,
+                last_name.chars().next().unwrap(),
+                domain
+            ),
+            name: name.to_string(),
+            domain: domain.to_string(),
+        });
+        emails_db.push(FounderDomainEmail {
+            email: format!(
+                "{}{}@{}",
+                first_name.chars().next().unwrap(),
+                last_name,
+                domain
+            ),
+            name: name.to_string(),
+            domain: domain.to_string(),
+        });
+    }
+
+    emails_db
 }
 
 async fn filter_verified_emails(sentinel: web::Data<Sentinel>, emails: Vec<String>) -> Vec<String> {
@@ -515,8 +567,8 @@ mod tests {
     use itertools::Itertools;
 
     use crate::routes::lead_route::{
-        construct_emails, extract_founder_names, get_domain_from_url, DomainFounderQualified,
-        FounderElement, FounderTagCandidate,
+        extract_founder_names, get_domain_from_url, get_email_permutations, FounderElement,
+        FounderTagCandidate,
     };
 
     #[test]
@@ -682,20 +734,17 @@ mod tests {
     }
 
     #[test]
-    fn construct_emails_valid() {
-        let domain_founders = vec![DomainFounderQualified {
-            names: vec![
-                "Dan Go".to_string(),
-                "HÃ©lÃ¨ne de Troostembergh".to_string(),
-                "Samina Qureshi".to_string(),
-                "Wondercise Technology Corp.".to_string(),
-                "Veer Pushpak Gupta".to_string(),
-                "Deepak L. Bhatt".to_string(),
-                "WellTheory".to_string(),
-                "West Shell III".to_string(),
-            ],
-            domain: "verywellfit.com".to_string(),
-        }];
+    fn construct_email_permutations_valid() {
+        let names = [
+            "Dan Go".to_string(),
+            "HÃ©lÃ¨ne de Troostembergh".to_string(),
+            "Samina Qureshi".to_string(),
+            "Wondercise Technology Corp.".to_string(),
+            "Veer Pushpak Gupta".to_string(),
+            "Deepak L. Bhatt".to_string(),
+            "WellTheory".to_string(),
+            "West Shell III".to_string(),
+        ];
 
         let expected = vec![
             "dan@verywellfit.com".to_string(),
@@ -712,7 +761,12 @@ mod tests {
             "squreshi@verywellfit.com".to_string(),
         ];
 
-        let results = construct_emails(domain_founders);
+        let mut results: Vec<String> = vec![];
+        for name in names {
+            let emails = get_email_permutations(&name, "verywellfit.com");
+            results.extend(emails.into_iter().map(|e| e.email));
+        }
+
         assert_eq!(results, expected)
     }
 }
