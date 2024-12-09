@@ -451,13 +451,13 @@ fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<S
 
 #[derive(Clone)]
 pub struct FounderDomain {
-    name: String,
-    domain: String,
+    pub founder_name: String,
+    pub domain: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FounderDomainEmail {
-    pub name: String,
+    pub founder_name: String,
     pub domain: String,
     pub email: String,
 }
@@ -476,7 +476,7 @@ async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Result<Vec<Str
             }
         }
 
-        let emails_db = get_email_permutations(&fd.name, &fd.domain);
+        let emails_db = get_email_permutations(&fd.founder_name, &fd.domain);
         if emails_db.is_empty() {
             continue;
         }
@@ -507,22 +507,22 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
 
         emails_db.push(FounderDomainEmail {
             email: format!("{}@{}", first_name, domain),
-            name: name.to_string(),
+            founder_name: name.to_string(),
             domain: domain.to_string(),
         });
         emails_db.push(FounderDomainEmail {
             email: format!("{}@{}", last_name, domain),
-            name: name.to_string(),
+            founder_name: name.to_string(),
             domain: domain.to_string(),
         });
         emails_db.push(FounderDomainEmail {
             email: format!("{}{}@{}", first_name, last_name, domain),
-            name: name.to_string(),
+            founder_name: name.to_string(),
             domain: domain.to_string(),
         });
         emails_db.push(FounderDomainEmail {
             email: format!("{}.{}@{}", first_name, last_name, domain),
-            name: name.to_string(),
+            founder_name: name.to_string(),
             domain: domain.to_string(),
         });
         emails_db.push(FounderDomainEmail {
@@ -532,7 +532,7 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
                 last_name.chars().next().unwrap(),
                 domain
             ),
-            name: name.to_string(),
+            founder_name: name.to_string(),
             domain: domain.to_string(),
         });
         emails_db.push(FounderDomainEmail {
@@ -542,7 +542,7 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
                 last_name,
                 domain
             ),
-            name: name.to_string(),
+            founder_name: name.to_string(),
             domain: domain.to_string(),
         });
     }

@@ -194,19 +194,96 @@ pub async fn get_founder_domains(
     domains: Vec<String>,
     pool: &PgPool,
 ) -> Result<Vec<FounderDomain>, sqlx::Error> {
-    todo!()
+    let record = sqlx::query!(
+        r#"
+        select
+            founder_name,
+            domain
+        from
+            founder
+        where
+            domain = any($1) and
+            domain is not null and
+            founder_name is not null
+        "#,
+        &domains,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(record
+        .into_iter()
+        .map(|row| FounderDomain {
+            founder_name: row.founder_name.unwrap(),
+            domain: row.domain.unwrap(),
+        })
+        .collect())
 }
 
 pub async fn get_raw_emails(
     founder_domain: FounderDomain,
     pool: &PgPool,
 ) -> Result<Vec<String>, sqlx::Error> {
-    todo!()
+    sqlx::query_scalar!(
+        r#"
+        select
+            e.email_address
+        from
+            email e
+            join founder f on f.id = e.founder_id
+        where
+            f.domain = $1 and
+            f.founder_name = $2
+        "#,
+        founder_domain.domain,
+        founder_domain.founder_name,
+    )
+    .fetch_all(pool)
+    .await
 }
 
+#[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "EmailVerifiedStatus", rename_all = "SCREAMING_SNAKE_CASE")]
+enum EmailVerifiedStatus {
+    Pending,
+    Verified,
+    Invalid,
+}
 pub async fn add_emails(
     founder_domain_emails: Vec<FounderDomainEmail>,
     pool: &PgPool,
-) -> Result<Vec<FounderDomain>, sqlx::Error> {
-    todo!()
+) -> Result<(), sqlx::Error> {
+    for fde in founder_domain_emails {
+        let founder_id = sqlx::query_scalar!(
+            r#"
+            select id from founder where domain = $1 and founder_name = $2
+            "#,
+            fde.domain,
+            fde.founder_name,
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if founder_id.is_none() {
+            continue;
+        }
+        let founder_id = founder_id.unwrap();
+
+        sqlx::query!(
+            r#"
+            insert into email
+                (id, founder_id, email_address, verified_status)
+            values
+                ($1, $2, $3, $4)
+            "#,
+            Uuid::new_v4(),
+            founder_id,
+            fde.email,
+            EmailVerifiedStatus::Pending as EmailVerifiedStatus,
+        )
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
 }

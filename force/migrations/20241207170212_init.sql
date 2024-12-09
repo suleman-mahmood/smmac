@@ -3,6 +3,12 @@ create type ElementType as enum (
 	'H_THREE'
 );
 
+create type EmailVerifiedStatus as enum (
+	'PENDING',
+	'VERIFIED',
+	'INVALID'
+);
+
 create table product (
 	id uuid primary key,
 	niche text not null,
@@ -34,6 +40,6 @@ create table email (
 	id uuid primary key,
 	founder_id uuid not null references founder(id),
 	email_address text not null unique,
-	verified bool not null,
+	verified_status EmailVerifiedStatus not null,
 	created_at timestamptz not null default now()
 );
