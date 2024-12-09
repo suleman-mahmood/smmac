@@ -1,9 +1,15 @@
+use std::time::Duration;
+
 use actix_web::{get, web, HttpResponse};
 use itertools::Itertools;
 use rand::Rng;
 use serde::Deserialize;
 use sqlx::PgPool;
-use thirtyfour::{error::WebDriverError, By};
+use thirtyfour::{
+    error::WebDriverError,
+    prelude::{ElementQueryable, ElementWaitable},
+    By,
+};
 use url::Url;
 
 use crate::{
@@ -240,82 +246,107 @@ async fn extract_data_from_google_search(
         driver = drivers.get(driver_index).unwrap();
         driver.goto(url.clone()).await?;
 
-        match driver.find(By::XPath("//h3")).await {
+        match driver
+            .query(By::XPath("//h3"))
+            .wait(Duration::from_secs(11), Duration::from_secs(2))
+            .exists()
+            .await
+        {
             // No h3 tag found
-            Err(_) => match driver
-                .find(By::XPath("//div[contains(@class, 'card-section')]/ul"))
-                .await
-            {
-                // There are no results on page
-                Ok(_) => {
-                    log::error!("Found no results on url: {}", url);
-                    return Ok(GoogleSearchResult::NotFound);
+            Err(_) => match driver.source().await {
+                Ok(source) => {
+                    if source.contains("did not match any documents") {
+                        log::error!("Found no results on url: {}", url);
+                        return Ok(GoogleSearchResult::NotFound);
+                    } else {
+                        captcha_blocked = true
+                    }
                 }
-                // You have been blocked by captcha
                 Err(_) => captcha_blocked = true,
             },
-            Ok(_) => match search_type {
-                GoogleSearchType::Domain => {
-                    let mut domain_urls: Vec<String> = vec![];
-                    let mut next_page_url = None;
+            Ok(exists) => {
+                if exists {
+                    match search_type {
+                        GoogleSearchType::Domain => {
+                            let mut domain_urls: Vec<String> = vec![];
+                            let mut next_page_url = None;
 
-                    for a_tag in driver.find_all(By::XPath("//a")).await? {
-                        let href_attribute = a_tag.attr("href").await?;
-                        if let Some(href) = href_attribute {
-                            domain_urls.push(href);
+                            for a_tag in driver.find_all(By::XPath("//a")).await? {
+                                let href_attribute = a_tag.attr("href").await?;
+                                if let Some(href) = href_attribute {
+                                    domain_urls.push(href);
+                                }
+                            }
+
+                            log::info!("Found {} urls | Potential domains", domain_urls.len(),);
+
+                            if let Ok(next_page_element) =
+                                driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await
+                            {
+                                if let Some(href_attribute) = next_page_element.attr("href").await?
+                                {
+                                    let next_url =
+                                        format!("https://www.google.com{}", href_attribute);
+                                    next_page_url = Some(next_url);
+                                }
+                            }
+
+                            return Ok(GoogleSearchResult::Domains {
+                                domain_urls,
+                                next_page_url,
+                            });
+                        }
+                        GoogleSearchType::Founder(ref domain) => {
+                            let mut h3_tags = vec![];
+                            let mut span_tags = vec![];
+
+                            for h3_tag in driver.find_all(By::XPath("//h3")).await? {
+                                let text = h3_tag.text().await?;
+                                h3_tags.push(text);
+                            }
+
+                            // TODO: Update this query, returns no result
+                            for span_tag in driver
+                                .find_all(By::XPath(
+                                    "//h3/following-sibling::div/div/div/div[1]/span",
+                                ))
+                                .await?
+                            {
+                                let text = span_tag.text().await?;
+                                span_tags.push(text);
+                            }
+
+                            log::info!(
+                                "Found {} h3_tags, {} span_tags | Potential founder names",
+                                h3_tags.len(),
+                                span_tags.len()
+                            );
+
+                            let elements = h3_tags
+                                .into_iter()
+                                .map(FounderElement::H3)
+                                .chain(span_tags.into_iter().map(FounderElement::Span))
+                                .collect();
+                            return Ok(GoogleSearchResult::Founders(FounderTagCandidate {
+                                elements,
+                                domain: domain.to_string(),
+                            }));
                         }
                     }
-
-                    log::info!("Found {} urls | Potential domains", domain_urls.len(),);
-
-                    if let Ok(next_page_element) =
-                        driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await
-                    {
-                        if let Some(href_attribute) = next_page_element.attr("href").await? {
-                            let next_url = format!("https://www.google.com{}", href_attribute);
-                            next_page_url = Some(next_url);
+                } else {
+                    match driver.source().await {
+                        Ok(source) => {
+                            if source.contains("did not match any documents") {
+                                log::error!("Found no results on url: {}", url);
+                                return Ok(GoogleSearchResult::NotFound);
+                            } else {
+                                captcha_blocked = true
+                            }
                         }
+                        Err(_) => captcha_blocked = true,
                     }
-
-                    return Ok(GoogleSearchResult::Domains {
-                        domain_urls,
-                        next_page_url,
-                    });
                 }
-                GoogleSearchType::Founder(ref domain) => {
-                    let mut h3_tags = vec![];
-                    let mut span_tags = vec![];
-
-                    for h3_tag in driver.find_all(By::XPath("//h3")).await? {
-                        let text = h3_tag.text().await?;
-                        h3_tags.push(text);
-                    }
-
-                    for span_tag in driver
-                        .find_all(By::XPath("//h3/following-sibling::div/div/div/div[1]/span"))
-                        .await?
-                    {
-                        let text = span_tag.text().await?;
-                        span_tags.push(text);
-                    }
-
-                    log::info!(
-                        "Found {} h3_tags, {} span_tags | Potential founder names",
-                        h3_tags.len(),
-                        span_tags.len()
-                    );
-
-                    let elements = h3_tags
-                        .into_iter()
-                        .map(FounderElement::H3)
-                        .chain(span_tags.into_iter().map(FounderElement::Span))
-                        .collect();
-                    return Ok(GoogleSearchResult::Founders(FounderTagCandidate {
-                        elements,
-                        domain: domain.to_string(),
-                    }));
-                }
-            },
+            }
         }
     }
 

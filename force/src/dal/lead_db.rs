@@ -128,7 +128,6 @@ pub async fn get_founder_tags(
     let rows = sqlx::query!(
         r#"
         select
-            domain,
             element_content,
             element_type as "element_type: ElementType"
         from
@@ -140,6 +139,10 @@ pub async fn get_founder_tags(
     )
     .fetch_all(pool)
     .await?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
 
     let elements = rows
         .into_iter()
