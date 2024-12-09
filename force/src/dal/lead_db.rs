@@ -152,10 +152,11 @@ pub async fn get_founder_tags(
 
 pub async fn insert_founders(
     founder: FounderTagCandidate,
+    names: Vec<Option<String>>,
     domain: &str,
     pool: &PgPool,
 ) -> Result<(), sqlx::Error> {
-    for ele in founder.elements {
+    for (ele, name) in founder.elements.into_iter().zip(names.into_iter()) {
         let content;
         let element_type = match ele {
             FounderElement::Span(c) => {
@@ -171,14 +172,15 @@ pub async fn insert_founders(
         sqlx::query!(
             r#"
             insert into founder
-                (id, domain, element_content, element_type)
+                (id, domain, element_content, element_type, founder_name)
             values
-                ($1, $2, $3, $4)
+                ($1, $2, $3, $4, $5)
             "#,
             Uuid::new_v4(),
             domain,
             content,
             element_type as ElementType,
+            name,
         )
         .execute(pool)
         .await?;

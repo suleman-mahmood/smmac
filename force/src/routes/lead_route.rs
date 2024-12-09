@@ -73,7 +73,8 @@ async fn get_leads_from_niche(
     }
     let domains = domains_result.unwrap();
 
-    let raw_founders_result = get_founders_from_google_searches(&droid, &pool, domains).await;
+    let raw_founders_result =
+        get_founders_from_google_searches(&droid, &pool, domains.clone()).await;
     if let Err(error) = raw_founders_result {
         return HttpResponse::Ok().body(format!(
             "Got webdriver error from founder google searches: {:?}",
@@ -88,24 +89,24 @@ async fn get_leads_from_niche(
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
 
-    let founders = extract_founder_names(raw_founders);
+    // let founders = extract_founder_names(raw_founders);
+    //
+    // let count = founders.iter().fold(0, |acc, x| acc + x.names.len());
 
-    let count = founders.iter().fold(0, |acc, x| acc + x.names.len());
+    // log::info!(">>> >>> >>>");
+    // log::info!("Total Qualified Founders: {}", count);
+    // log::info!(">>> >>> >>>");
 
-    log::info!(">>> >>> >>>");
-    log::info!("Total Qualified Founders: {}", count);
-    log::info!(">>> >>> >>>");
+    // let raw_emails = construct_emails(founders);
 
-    let raw_emails = construct_emails(founders);
-
-    log::info!(">>> >>> >>>");
-    log::info!("Constructed emails: {}", raw_emails.len());
-    log::info!(">>> >>> >>>");
+    // log::info!(">>> >>> >>>");
+    // log::info!("Constructed emails: {}", raw_emails.len());
+    // log::info!(">>> >>> >>>");
 
     // let emails = filter_verified_emails(sentinel, raw_emails).await;
 
     // HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
-    HttpResponse::Ok().json(raw_emails)
+    HttpResponse::Ok().json(domains)
 }
 
 async fn get_urls_from_google_searches(
@@ -373,8 +374,10 @@ async fn get_founders_from_google_searches(
                 founder_candidate.push(tag_candidate.clone());
 
                 // Save results to db
-                // TODO: insert founder_name as well
-                if let Err(e) = lead_db::insert_founders(tag_candidate.clone(), &domain, pool).await
+                let founder_names = extract_founder_names(tag_candidate.clone());
+                if let Err(e) =
+                    lead_db::insert_founders(tag_candidate.clone(), founder_names, &domain, pool)
+                        .await
                 {
                     log::error!(
                         "Error inserting domain founders in db for domain: {} and candidates: {:?} and error {:?}",
@@ -426,48 +429,34 @@ fn get_domain_from_url(url: &str) -> Option<String> {
     }
 }
 
-fn extract_founder_names(
-    founder_candidates: Vec<FounderTagCandidate>,
-) -> Vec<DomainFounderQualified> {
-    founder_candidates
+fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<String>> {
+    founder_candidate
+        .elements
         .iter()
-        .map(|fc| {
-            let tags: Vec<String> = fc
-                .elements
-                .iter()
-                .filter_map(|t| match t {
-                    FounderElement::Span(t) => match t.strip_prefix("LinkedIn Â· ") {
-                        Some(right_word) => {
-                            let right_word_original = right_word.to_string();
+        .map(|t| match t {
+            FounderElement::Span(t) => match t.strip_prefix("LinkedIn Â· ") {
+                Some(right_word) => {
+                    let right_word_original = right_word.to_string();
 
-                            let result =
-                                match right_word.split(",").collect::<Vec<&str>>().as_slice() {
-                                    [name, ..] => name.to_string(),
-                                    _ => right_word_original,
-                                };
+                    let result = match right_word.split(",").collect::<Vec<&str>>().as_slice() {
+                        [name, ..] => name.to_string(),
+                        _ => right_word_original,
+                    };
 
-                            let result = match result.contains("Dr.") {
-                                true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
-                                false => result,
-                            };
-                            let result = match result.contains("Dr") {
-                                true => result.strip_prefix("Dr").unwrap().trim().to_string(),
-                                false => result,
-                            };
+                    let result = match result.contains("Dr.") {
+                        true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
+                        false => result,
+                    };
+                    let result = match result.contains("Dr") {
+                        true => result.strip_prefix("Dr").unwrap().trim().to_string(),
+                        false => result,
+                    };
 
-                            Some(result)
-                        }
-                        None => None,
-                    },
-                    FounderElement::H3(_) => None,
-                })
-                .collect();
-
-            let tags = tags.into_iter().unique().collect();
-            DomainFounderQualified {
-                names: tags,
-                domain: fc.domain.clone(),
-            }
+                    Some(result)
+                }
+                None => None,
+            },
+            FounderElement::H3(_) => None,
         })
         .collect()
 }
@@ -520,6 +509,8 @@ async fn filter_verified_emails(sentinel: web::Data<Sentinel>, emails: Vec<Strin
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use crate::routes::lead_route::{
         construct_emails, extract_founder_names, get_domain_from_url, DomainFounderQualified,
         FounderElement, FounderTagCandidate,
@@ -576,7 +567,7 @@ mod tests {
 
     #[test]
     fn extract_founder_names_valid() {
-        let candidates = vec![FounderTagCandidate {
+        let candidate = FounderTagCandidate {
             elements: vec![
                 FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
                 FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
@@ -662,29 +653,28 @@ mod tests {
                 FounderElement::H3("David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string()),
             ],
             domain: "verywellfit.com".to_string(),
-        }];
+        };
 
-        let expected = vec![DomainFounderQualified {
-            names: vec![
-                "Dan Go".to_string(),
-                "HÃ©lÃ¨ne de Troostembergh".to_string(),
-                "Samina Qureshi".to_string(),
-                "Wondercise Technology Corp.".to_string(),
-                "Veer Pushpak Gupta".to_string(),
-                "Hasnain Sajjad".to_string(),
-                "Deepak L. Bhatt".to_string(),
-                "Ronald Klatz".to_string(),
-                "WellTheory".to_string(),
-                "West Shell III".to_string(),
-                "Cathy Cassata".to_string(),
-                "Shravan Verma".to_string(),
-                "anwar khan".to_string(),
-                "Christopher Dean".to_string(),
-            ],
-            domain: "verywellfit.com".to_string(),
-        }];
+        let expected = vec![
+            "Dan Go".to_string(),
+            "HÃ©lÃ¨ne de Troostembergh".to_string(),
+            "Samina Qureshi".to_string(),
+            "Wondercise Technology Corp.".to_string(),
+            "Veer Pushpak Gupta".to_string(),
+            "Hasnain Sajjad".to_string(),
+            "Deepak L. Bhatt".to_string(),
+            "Ronald Klatz".to_string(),
+            "WellTheory".to_string(),
+            "West Shell III".to_string(),
+            "Cathy Cassata".to_string(),
+            "Shravan Verma".to_string(),
+            "anwar khan".to_string(),
+            "Christopher Dean".to_string(),
+        ];
 
-        let results = extract_founder_names(candidates);
+        let results = extract_founder_names(candidate);
+        let results: Vec<String> = results.into_iter().flatten().collect();
+        let results: Vec<String> = results.into_iter().unique().collect();
         assert_eq!(results, expected)
     }
 
