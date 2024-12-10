@@ -276,6 +276,7 @@ async fn get_valid_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
         .into_iter()
         .filter(|name| name.split(" ").collect_vec().len() == 2)
         .collect();
+    let elements: Vec<String> = elements.into_iter().unique().collect();
 
     HttpResponse::Ok().json(elements)
 }
