@@ -1,3 +1,6 @@
+use check_if_email_exists::{
+    check_email, CheckEmailInput, CheckEmailInputProxy, Reachable, SmtpSecurity,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +32,7 @@ impl Sentinel {
         }
     }
 
-    pub async fn verfiy_email(&self, email: String) -> bool {
+    pub async fn verfiy_email_from_bulk_mail_checker(&self, email: String) -> bool {
         match self
             .client
             .get(self.url.clone())
@@ -51,6 +54,40 @@ impl Sentinel {
                 log::error!("Got error from bulk email check api: {:?}", e);
                 false
             }
+        }
+    }
+
+    pub async fn verfiy_email(&self, email: String) -> bool {
+        let mut input = CheckEmailInput::new(email);
+        input
+            .set_from_email("random.guy@fit.com".to_string())
+            .set_hello_name("verywellfit.com".to_string());
+
+        // .set_proxy(CheckEmailInputProxy {
+        //     host: "p.webshare.io".to_string(),
+        //     port: 9999,
+        //     username: None,
+        //     password: None,
+        // }); //works
+        // .set_proxy(CheckEmailInputProxy {
+        //     host: "69.12.93.165".to_string(),
+        //     port: 6185,
+        //     username: None,
+        //     password: None,
+        // }); //works
+        // .set_gmail_use_api(true) // SMTP is ok and its API works but invalid email
+        // .set_smtp_port(587);
+
+        // Verify this email, using async/await syntax.
+        let result = check_email(&input).await;
+
+        log::info!("Result from API: {:?}", result);
+
+        match result.is_reachable {
+            Reachable::Safe => true,
+            Reachable::Unknown => false,
+            Reachable::Risky => false,
+            Reachable::Invalid => false,
         }
     }
 }

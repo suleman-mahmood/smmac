@@ -79,19 +79,21 @@ async fn next_search(droid: web::Data<Droid>) -> HttpResponse {
 #[get("/verify-emails")]
 async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
     let emails: Vec<String> = vec![
-        "dan@verywellfit.com".to_string(),
-        "go@verywellfit.com".to_string(),
-        "dango@verywellfit.com".to_string(),
-        "dan.go@verywellfit.com".to_string(),
-        "dang@verywellfit.com".to_string(),
-        "dgo@verywellfit.com".to_string(),
-        "samina@verywellfit.com".to_string(),
-        "qureshi@verywellfit.com".to_string(),
-        "saminaqureshi@verywellfit.com".to_string(),
-        "samina.qureshi@verywellfit.com".to_string(),
-        "saminaq@verywellfit.com".to_string(),
-        "squreshi@verywellfit.com".to_string(),
-        "suleman@mazlo.com".to_string(),
+        // "dan@verywellfit.com".to_string(),
+        // "go@verywellfit.com".to_string(),
+        // "dango@verywellfit.com".to_string(),
+        // "dan.go@verywellfit.com".to_string(),
+        // "dang@verywellfit.com".to_string(),
+        // "dgo@verywellfit.com".to_string(),
+        // "samina@verywellfit.com".to_string(),
+        // "qureshi@verywellfit.com".to_string(),
+        // "saminaqureshi@verywellfit.com".to_string(),
+        // "samina.qureshi@verywellfit.com".to_string(),
+        // "saminaq@verywellfit.com".to_string(),
+        // "squreshi@verywellfit.com".to_string(),
+        // "suleman@mazlo.com".to_string(),
+        "sulemanmahmood99@gmail.com".to_string(),
+        "sulemanmahmood9988347@gmail.com".to_string(),
     ];
     let mut verified_emails: Vec<String> = vec![];
 
@@ -279,4 +281,22 @@ async fn get_valid_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
     let elements: Vec<String> = elements.into_iter().unique().collect();
 
     HttpResponse::Ok().json(elements)
+}
+
+#[derive(Deserialize)]
+struct VerifyEmailQuery {
+    email: String,
+}
+
+#[get("/verify-email")]
+async fn verify_email(
+    query: web::Query<VerifyEmailQuery>,
+    sentinel: web::Data<Sentinel>,
+) -> HttpResponse {
+    let email_verified = sentinel.verfiy_email(query.email.clone()).await;
+
+    HttpResponse::Ok().body(format!(
+        "Email {:?} was verfied? {}",
+        query.email, email_verified
+    ))
 }

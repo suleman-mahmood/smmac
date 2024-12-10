@@ -28,6 +28,7 @@ rand = "0.8"
 url = "2.5"
 itertools = "0.13"
 fake_user_agent = "0.2"
+check-if-email-exists = "0.9"
 
 [dependencies.sqlx]
 version = "0.8"
