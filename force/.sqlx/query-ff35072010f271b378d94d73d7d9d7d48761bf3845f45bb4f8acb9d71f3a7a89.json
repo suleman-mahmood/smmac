@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            founder_name,\n            domain\n        from\n            founder\n        where\n            domain = any($1) and\n            domain is not null and\n            founder_name is not null\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "founder_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "domain",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "ff35072010f271b378d94d73d7d9d7d48761bf3845f45bb4f8acb9d71f3a7a89"
+}

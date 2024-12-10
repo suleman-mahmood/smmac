@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into domain\n                (id, product_id, domain_candidate_url, domain, founder_search_url)\n            values\n                ($1, $2, $3, $4, $5)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3fc79d167e47d9f69c79dbc1487ce4d65fbd6b54067971b6ed03ab08f5e6f446"
+}

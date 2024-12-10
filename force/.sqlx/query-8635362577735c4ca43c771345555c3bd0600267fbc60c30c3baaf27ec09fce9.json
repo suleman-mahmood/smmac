@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into founder\n                (id, domain, element_content, element_type, founder_name)\n            values\n                ($1, $2, $3, $4, $5)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "elementtype",
+            "kind": {
+              "Enum": [
+                "SPAN",
+                "H_THREE"
+              ]
+            }
+          }
+        },
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8635362577735c4ca43c771345555c3bd0600267fbc60c30c3baaf27ec09fce9"
+}
