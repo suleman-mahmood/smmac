@@ -117,7 +117,7 @@ pub async fn insert_domain_candidate_urls(
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "ElementType", rename_all = "SCREAMING_SNAKE_CASE")]
-enum ElementType {
+pub enum ElementType {
     Span,
     HThree,
 }

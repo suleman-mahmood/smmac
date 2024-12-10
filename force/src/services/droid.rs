@@ -5,7 +5,7 @@ use thirtyfour::{
 };
 use tokio::sync::Mutex;
 
-const NUM_PARALLEL_DRIVERS: u8 = 10_u8;
+const NUM_PARALLEL_DRIVERS: u8 = 1_u8;
 
 const PROXIES: [&str; 100] = [
     "69.12.93.165:6185",

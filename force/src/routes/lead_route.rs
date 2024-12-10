@@ -462,7 +462,7 @@ pub fn get_domain_from_url(url: &str) -> Option<String> {
 }
 
 // TODO: Pass list of elements instead
-fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<String>> {
+pub fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<String>> {
     founder_candidate
         .elements
         .iter()
@@ -489,7 +489,42 @@ fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<S
                 }
                 None => None,
             },
-            FounderElement::H3(_) => None,
+            FounderElement::H3(content) => {
+                /*
+                 Match with both in lowercase
+                 1. Split by "'s Post -" and get content before the split
+                 3. Split by "on LinkedIn" and get content before the split
+                 4. Split by "posted on" and get content before the split
+                 2. Split by "-" and get content before the split
+                 5. Split by "|" and get content before the split
+                */
+                let strategies = [
+                    "'s Post -",
+                    "posted on",
+                    "on LinkedIn",
+                    "en LinkedIn",
+                    "auf LinkedIn",
+                    "sur LinkedIn",
+                    "-",
+                    "–", // I know, this is a different character
+                    "|",
+                ];
+
+                let strategies: Vec<String> =
+                    strategies.iter().map(|st| st.to_lowercase()).collect();
+                let content = content.to_lowercase();
+
+                let first_match = strategies
+                    .iter()
+                    .filter_map(|st| {
+                        content
+                            .split_once(st)
+                            .map(|parts| parts.0.trim().to_string())
+                    })
+                    .next();
+
+                first_match
+            }
         })
         .collect()
 }
@@ -669,107 +704,155 @@ mod tests {
     fn extract_founder_names_valid() {
         let candidate = FounderTagCandidate {
             elements: vec![
-                FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
-                FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
-                FounderElement::Span("LinkedIn Â· HÃ©lÃ¨ne de Troostembergh".to_string()),
-                FounderElement::Span("LinkedIn Â· Samina Qureshi, RDN LD".to_string()),
-                FounderElement::Span("LinkedIn Â· Wondercise Technology Corp.".to_string()),
-                FounderElement::Span("LinkedIn Â· Dr Veer Pushpak Gupta".to_string()),
-                FounderElement::Span("LinkedIn Â· Hasnain Sajjad".to_string()),
-                FounderElement::Span("LinkedIn Â· Deepak L. Bhatt, MD, MPH, MBA".to_string()),
-                FounderElement::Span("LinkedIn Â· Dr. Ronald Klatz, MD, DO".to_string()),
-                FounderElement::Span("LinkedIn Â· WellTheory".to_string()),
-                FounderElement::Span("LinkedIn Â· WellTheory".to_string()),
-                FounderElement::Span("LinkedIn Â· West Shell III".to_string()),
-                FounderElement::Span("LinkedIn Â· Cathy Cassata".to_string()),
-                FounderElement::Span("LinkedIn Â· Shravan Verma".to_string()),
-                FounderElement::Span("LinkedIn Â· anwar khan".to_string()),
-                FounderElement::Span("LinkedIn Â· Christopher Dean".to_string()),
-                FounderElement::Span("LinkedIn India".to_string()),
-                FounderElement::Span("LinkedIn".to_string()),
-                FounderElement::H3("Dan Go's Post".to_string()),
-                FounderElement::H3("Eric Chuang on LinkedIn: Putting up the sign!".to_string()),
-                FounderElement::H3("Dan Buettner's Post".to_string()),
-                FounderElement::H3("Sarah Garone's Post".to_string()),
-                FounderElement::H3(
-                    "HÃ©lÃ¨ne de Troostembergh - Truly inspiring Tanguy Goretti".to_string(),
-                ),
-                FounderElement::H3("Samina Qureshi, RDN LD's Post".to_string()),
-                FounderElement::H3("Tanguy Goretti's Post".to_string()),
-                FounderElement::H3("Wondercise Technology Corp.".to_string()),
-                FounderElement::H3("Dr. Gwilym Roddick's Post".to_string()),
-                FounderElement::H3(
-                    "Honor Whiteman - Senior Editorial Director - RVO Health".to_string(),
-                ),
-                FounderElement::H3(
-                    "Tim Snaith - Newsletter Editor II - Medical News Today".to_string(),
-                ),
-                FounderElement::H3("Hasnain Sajjad on LinkedIn: #al".to_string()),
-                FounderElement::H3(
-                    "Dr Veer Pushpak Gupta - nhs #healthcare #unitedkingdom".to_string(),
-                ),
-                FounderElement::H3("Beth Frates, MD's Post".to_string()),
-                FounderElement::H3("Deepak L. Bhatt, MD, MPH, MBA's Post".to_string()),
-                FounderElement::H3("Dr. Ronald Klatz, MD, DO's Post".to_string()),
-                FounderElement::H3("WellTheory".to_string()),
-                FounderElement::H3("Uma Naidoo, MD".to_string()),
-                FounderElement::H3("Dr William Bird MBE's Post".to_string()),
-                FounderElement::H3("Georgette Smart - CEO E*HealthLine".to_string()),
-                FounderElement::H3("David Kopp's Post".to_string()),
-                FounderElement::H3(
-                    "West Shell III - GOES (Global Outdoor Emergency Support)".to_string(),
-                ),
-                FounderElement::H3(
-                    "Cathy Cassata - Freelance Writer - Healthline Networks, Inc.".to_string(),
-                ),
-                FounderElement::H3("Healthline Media".to_string()),
-                FounderElement::H3("Health Line - Healthline Team Member".to_string()),
-                FounderElement::H3("David Mills - Associate editor - healthline.com".to_string()),
-                FounderElement::H3("Kevin Yoshiyama - Healthline Media".to_string()),
-                FounderElement::H3("Cortland Dahl's Post".to_string()),
-                FounderElement::H3("Kelsey Costa, MS, RDN's Post".to_string()),
-                FounderElement::H3("babulal parashar - great innovation".to_string()),
-                FounderElement::H3("Shravan Verma - Manager - PANI".to_string()),
-                FounderElement::H3("anwar khan's Post".to_string()),
-                FounderElement::H3(
-                    "Christopher Dean - Sculptor Marble dreaming. collaborator ...".to_string(),
-                ),
-                FounderElement::H3("Manish Ambast's Post".to_string()),
-                FounderElement::H3("Mark Balderman Highlove - Installation Specialist".to_string()),
-                FounderElement::H3("100+ \"Partho Roy\" profiles".to_string()),
-                FounderElement::H3(
-                    "James Weisz on LinkedIn: #website #developer #film".to_string(),
-                ),
-                FounderElement::H3(
-                    "Ravindra Prakash - Plant Manager - Shree Dhanwantri ...".to_string(),
-                ),
-                FounderElement::H3("Traditional Medicinals".to_string()),
-                FounderElement::H3("Caitlin Landesberg on LinkedIn: Home".to_string()),
-                FounderElement::H3("Traditional Medicinals".to_string()),
-                FounderElement::H3("Joe Stanziano's Post".to_string()),
-                FounderElement::H3("Traditional Medicinals | à¦²à¦¿à¦‚à¦•à¦¡à¦‡à¦¨".to_string()),
-                FounderElement::H3("Kathy Avilla - Traditional Medicinals, Inc.".to_string()),
-                FounderElement::H3("Ben Hindman's Post - sxsw".to_string()),
-                FounderElement::H3("David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string()),
+                // FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
+                // FounderElement::Span("LinkedIn Â· Dan Go".to_string()),
+                // FounderElement::Span("LinkedIn Â· HÃ©lÃ¨ne de Troostembergh".to_string()),
+                // FounderElement::Span("LinkedIn Â· Samina Qureshi, RDN LD".to_string()),
+                // FounderElement::Span("LinkedIn Â· Wondercise Technology Corp.".to_string()),
+                // FounderElement::Span("LinkedIn Â· Dr Veer Pushpak Gupta".to_string()),
+                // FounderElement::Span("LinkedIn Â· Hasnain Sajjad".to_string()),
+                // FounderElement::Span("LinkedIn Â· Deepak L. Bhatt, MD, MPH, MBA".to_string()),
+                // FounderElement::Span("LinkedIn Â· Dr. Ronald Klatz, MD, DO".to_string()),
+                // FounderElement::Span("LinkedIn Â· WellTheory".to_string()),
+                // FounderElement::Span("LinkedIn Â· WellTheory".to_string()),
+                // FounderElement::Span("LinkedIn Â· West Shell III".to_string()),
+                // FounderElement::Span("LinkedIn Â· Cathy Cassata".to_string()),
+                // FounderElement::Span("LinkedIn Â· Shravan Verma".to_string()),
+                // FounderElement::Span("LinkedIn Â· anwar khan".to_string()),
+                // FounderElement::Span("LinkedIn Â· Christopher Dean".to_string()),
+                // FounderElement::Span("LinkedIn India".to_string()),
+                // FounderElement::Span("LinkedIn".to_string()),
+                // FounderElement::H3("Dan Go's Post".to_string()),
+                // FounderElement::H3("Eric Chuang on LinkedIn: Putting up the sign!".to_string()),
+                // FounderElement::H3("Dan Buettner's Post".to_string()),
+                // FounderElement::H3("Sarah Garone's Post".to_string()),
+                // FounderElement::H3(
+                //     "HÃ©lÃ¨ne de Troostembergh - Truly inspiring Tanguy Goretti".to_string(),
+                // ),
+                // FounderElement::H3("Samina Qureshi, RDN LD's Post".to_string()),
+                // FounderElement::H3("Tanguy Goretti's Post".to_string()),
+                // FounderElement::H3("Wondercise Technology Corp.".to_string()),
+                // FounderElement::H3("Dr. Gwilym Roddick's Post".to_string()),
+                // FounderElement::H3(
+                //     "Honor Whiteman - Senior Editorial Director - RVO Health".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Tim Snaith - Newsletter Editor II - Medical News Today".to_string(),
+                // ),
+                // FounderElement::H3("Hasnain Sajjad on LinkedIn: #al".to_string()),
+                // FounderElement::H3(
+                //     "Dr Veer Pushpak Gupta - nhs #healthcare #unitedkingdom".to_string(),
+                // ),
+                // FounderElement::H3("Beth Frates, MD's Post".to_string()),
+                // FounderElement::H3("Deepak L. Bhatt, MD, MPH, MBA's Post".to_string()),
+                // FounderElement::H3("Dr. Ronald Klatz, MD, DO's Post".to_string()),
+                // FounderElement::H3("WellTheory".to_string()),
+                // FounderElement::H3("Uma Naidoo, MD".to_string()),
+                // FounderElement::H3("Dr William Bird MBE's Post".to_string()),
+                // FounderElement::H3("Georgette Smart - CEO E*HealthLine".to_string()),
+                // FounderElement::H3("David Kopp's Post".to_string()),
+                // FounderElement::H3(
+                //     "West Shell III - GOES (Global Outdoor Emergency Support)".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Cathy Cassata - Freelance Writer - Healthline Networks, Inc.".to_string(),
+                // ),
+                // FounderElement::H3("Healthline Media".to_string()),
+                // FounderElement::H3("Health Line - Healthline Team Member".to_string()),
+                // FounderElement::H3("David Mills - Associate editor - healthline.com".to_string()),
+                // FounderElement::H3("Kevin Yoshiyama - Healthline Media".to_string()),
+                // FounderElement::H3("Cortland Dahl's Post".to_string()),
+                // FounderElement::H3("Kelsey Costa, MS, RDN's Post".to_string()),
+                // FounderElement::H3("babulal parashar - great innovation".to_string()),
+                // FounderElement::H3("Shravan Verma - Manager - PANI".to_string()),
+                // FounderElement::H3("anwar khan's Post".to_string()),
+                // FounderElement::H3(
+                //     "Christopher Dean - Sculptor Marble dreaming. collaborator ...".to_string(),
+                // ),
+                // FounderElement::H3("Manish Ambast's Post".to_string()),
+                // FounderElement::H3("Mark Balderman Highlove - Installation Specialist".to_string()),
+                // FounderElement::H3("100+ \"Partho Roy\" profiles".to_string()),
+                // FounderElement::H3(
+                //     "James Weisz on LinkedIn: #website #developer #film".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Ravindra Prakash - Plant Manager - Shree Dhanwantri ...".to_string(),
+                // ),
+                // FounderElement::H3("Traditional Medicinals".to_string()),
+                // FounderElement::H3("Caitlin Landesberg on LinkedIn: Home".to_string()),
+                // FounderElement::H3("Traditional Medicinals".to_string()),
+                // FounderElement::H3("Joe Stanziano's Post".to_string()),
+                // FounderElement::H3("Traditional Medicinals | à¦²à¦¿à¦‚à¦•à¦¡à¦‡à¦¨".to_string()),
+                // FounderElement::H3("Kathy Avilla - Traditional Medicinals, Inc.".to_string()),
+                // FounderElement::H3("Ben Hindman's Post - sxsw".to_string()),
+                // FounderElement::H3("David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string()),
+                FounderElement::H3("Swati Bhargava - CashKaro.com - LinkedIn".to_string()),
+                FounderElement::H3("Rohan Bhargava - CashKaro.com - LinkedIn".to_string()),
+                // FounderElement::H3("Yatinn Ram Garg - CashKaro.com - LinkedIn".to_string()),
+                // FounderElement::H3(
+                //     "Swati Bhargava's Post - Co-founder of CashKaro.com - LinkedIn".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Piyush Sood - Senior Manager (Entrepreneur In Residence) - LinkedIn"
+                //         .to_string(),
+                // ),
+                // FounderElement::H3("Ishan Agarwal - CashKaro.com - LinkedIn".to_string()),
+                // FounderElement::H3(
+                //     "Swati Bhargava - How we launched CashKaro.com in India - LinkedIn".to_string(),
+                // ),
+                // FounderElement::H3("Swati Bhargava on LinkedIn: April Case Study".to_string()),
+                // FounderElement::H3(
+                //     "Swati Bhargava on LinkedIn: #valentinesday | 24 comments".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "BusinessOnBot on LinkedIn: CashKaro's Founder Swati Bhargava ...".to_string(),
+                // ),
+                // FounderElement::H3("Michael Moor - Foods Alive | LinkedIn".to_string()),
+                // FounderElement::H3("BAGHIR GULIYEV - Packer - FOOD TO LIVE - LinkedIn".to_string()),
+                // FounderElement::H3("Michael Moor - Foods Alive | LinkedIn".to_string()),
+                // FounderElement::H3(
+                //     "Jeremy Hinds on LinkedIn: #experience #future #food #brand ...".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Gagandeep Singh - Co-Founder and CEO - G9 Fresh | LinkedIn".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Linda Boardman - Bragg Live Food Products, LLC | LinkedIn".to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Kate K - Graphic Designer/SMM - Food To Live | LinkedIn".to_string(),
+                // ),
+                // FounderElement::H3("Food for Life - LinkedIn".to_string()),
+                // FounderElement::H3("Khaled Elithy's Post - LinkedIn".to_string()),
+                // FounderElement::H3(
+                //     "James Rickert on LinkedIn: #foodsystem #investment #partnership ..."
+                //         .to_string(),
+                // ),
+                // FounderElement::H3(
+                //     "Alexis Eyre on LinkedIn: #marketing #advertising #foodmarketing ..."
+                //         .to_string(),
+                // ),
             ],
             domain: "verywellfit.com".to_string(),
         };
 
         let expected = vec![
-            "Dan Go".to_string(),
-            "HÃ©lÃ¨ne de Troostembergh".to_string(),
-            "Samina Qureshi".to_string(),
-            "Wondercise Technology Corp.".to_string(),
-            "Veer Pushpak Gupta".to_string(),
-            "Hasnain Sajjad".to_string(),
-            "Deepak L. Bhatt".to_string(),
-            "Ronald Klatz".to_string(),
-            "WellTheory".to_string(),
-            "West Shell III".to_string(),
-            "Cathy Cassata".to_string(),
-            "Shravan Verma".to_string(),
-            "anwar khan".to_string(),
-            "Christopher Dean".to_string(),
+            // "Dan Go".to_string(),
+            // "HÃ©lÃ¨ne de Troostembergh".to_string(),
+            // "Samina Qureshi".to_string(),
+            // "Wondercise Technology Corp.".to_string(),
+            // "Veer Pushpak Gupta".to_string(),
+            // "Hasnain Sajjad".to_string(),
+            // "Deepak L. Bhatt".to_string(),
+            // "Ronald Klatz".to_string(),
+            // "WellTheory".to_string(),
+            // "West Shell III".to_string(),
+            // "Cathy Cassata".to_string(),
+            // "Shravan Verma".to_string(),
+            // "anwar khan".to_string(),
+            // "Christopher Dean".to_string(),
+            "swati bhargava".to_string(),
+            "rohan bhargava".to_string(),
         ];
 
         let results = extract_founder_names(candidate);

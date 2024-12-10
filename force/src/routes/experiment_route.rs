@@ -1,10 +1,15 @@
 use actix_web::{get, web, HttpResponse};
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 use sqlx::PgPool;
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
+use uuid::Uuid;
 
-use crate::services::{Droid, OpenaiClient, Sentinel};
+use crate::{
+    dal::lead_db::ElementType,
+    services::{Droid, OpenaiClient, Sentinel},
+};
 
 use super::lead_route;
 
@@ -190,4 +195,87 @@ async fn extract_domain_from_candidate_url(pool: web::Data<PgPool>) -> HttpRespo
     }
 
     HttpResponse::Ok().body("Done!")
+}
+
+struct element_with_id {
+    fe: lead_route::FounderElement,
+    id: Uuid,
+}
+
+#[get("/re-calculate-founder-names")]
+async fn recalculate_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
+    let elements: Vec<element_with_id> = sqlx::query!(
+        r#"
+        select
+            id,
+            element_content,
+            element_type as "element_type: ElementType"
+        from
+            founder
+        "#,
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .unwrap()
+    .into_iter()
+    .map(|r| match r.element_type {
+        ElementType::Span => element_with_id {
+            fe: lead_route::FounderElement::Span(r.element_content),
+            id: r.id,
+        },
+        ElementType::HThree => element_with_id {
+            fe: lead_route::FounderElement::H3(r.element_content),
+            id: r.id,
+        },
+    })
+    .collect();
+    let founders = lead_route::FounderTagCandidate {
+        elements: elements.iter().map(|e| e.fe.clone()).collect(),
+        domain: "random.domain".to_string(),
+    };
+
+    let founder_names = lead_route::extract_founder_names(founders);
+
+    for (ele, name) in elements.into_iter().zip(founder_names.into_iter()) {
+        sqlx::query!(
+            r#"
+            update founder set
+                founder_name = $2
+            where
+                id = $1
+            "#,
+            ele.id,
+            name,
+        )
+        .execute(pool.as_ref())
+        .await
+        .unwrap();
+    }
+
+    HttpResponse::Ok().body("Done!")
+}
+
+#[get("/valid-founder-names")]
+async fn get_valid_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
+    let elements = sqlx::query_scalar!(
+        r#"
+        select
+            founder_name
+        from
+            founder
+        where
+            founder_name is not null
+        "#,
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .unwrap();
+
+    let elements: Vec<String> = elements.into_iter().flatten().collect();
+    let elements: Vec<String> = elements
+        .into_iter()
+        .filter(|name| name.split(" ").collect_vec().len() == 2)
+        .collect();
+
+    HttpResponse::Ok().json(elements)
 }
