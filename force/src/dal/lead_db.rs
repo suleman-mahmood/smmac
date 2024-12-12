@@ -1,5 +1,6 @@
+use check_if_email_exists::Reachable;
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::{postgres::PgQueryResult, PgPool};
 use uuid::Uuid;
 
 use crate::routes::lead_route::{
@@ -258,11 +259,12 @@ pub async fn get_raw_emails(
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "EmailVerifiedStatus", rename_all = "SCREAMING_SNAKE_CASE")]
-enum EmailVerifiedStatus {
+pub enum EmailVerifiedStatus {
     Pending,
     Verified,
     Invalid,
 }
+
 pub async fn insert_emails(founder_domain_emails: Vec<FounderDomainEmail>, pool: &PgPool) {
     for fde in founder_domain_emails {
         let founder_id = sqlx::query_scalar!(
@@ -292,4 +294,46 @@ pub async fn insert_emails(founder_domain_emails: Vec<FounderDomainEmail>, pool:
             .await;
         }
     }
+}
+
+#[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "Reachability", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EmailReachability {
+    Safe,
+    Unknown,
+    Risky,
+    Invalid,
+}
+
+impl From<Reachable> for EmailReachability {
+    fn from(value: Reachable) -> Self {
+        match value {
+            Reachable::Safe => EmailReachability::Safe,
+            Reachable::Unknown => EmailReachability::Unknown,
+            Reachable::Risky => EmailReachability::Risky,
+            Reachable::Invalid => EmailReachability::Invalid,
+        }
+    }
+}
+
+pub async fn set_email_verification_reachability(
+    email: &str,
+    reachability: EmailReachability,
+    status: EmailVerifiedStatus,
+    pool: &PgPool,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        r#"
+        update email set
+            reachability = $2,
+            verified_status = $3
+        where
+            email_address = $1
+        "#,
+        email,
+        reachability as EmailReachability,
+        status as EmailVerifiedStatus,
+    )
+    .execute(pool)
+    .await
 }

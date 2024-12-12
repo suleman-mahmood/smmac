@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use actix_web::{get, web, HttpResponse};
+use check_if_email_exists::Reachable;
 use itertools::Itertools;
 use rand::Rng;
 use serde::Deserialize;
@@ -9,7 +10,7 @@ use thirtyfour::{error::WebDriverError, prelude::ElementQueryable, By};
 use url::Url;
 
 use crate::{
-    dal::lead_db,
+    dal::lead_db::{self, EmailReachability, EmailVerifiedStatus},
     services::{make_new_driver, Droid, OpenaiClient, Sentinel},
 };
 
@@ -79,11 +80,11 @@ async fn get_leads_from_niche(
     log::info!("Constructed emails: {}", raw_emails.len());
     log::info!(">>> >>> >>>");
 
-    let emails = filter_verified_emails(sentinel, raw_emails).await;
+    verify_emails(&pool, &sentinel, raw_emails).await;
 
     // TODO: Add save status in db
 
-    HttpResponse::Ok().json(emails)
+    HttpResponse::Ok().body("Done!")
 }
 
 async fn get_product_search_queries(
@@ -600,6 +601,18 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
     }
 
     emails_db
+}
+
+async fn verify_emails(pool: &PgPool, sentinel: &Sentinel, emails: Vec<String>) {
+    for em in emails {
+        let reachable = sentinel.get_email_verification_status(&em).await;
+        let status = match reachable {
+            Reachable::Safe => EmailVerifiedStatus::Verified,
+            _ => EmailVerifiedStatus::Invalid,
+        };
+        let reachable: EmailReachability = reachable.into();
+        _ = lead_db::set_email_verification_reachability(&em, reachable, status, pool).await;
+    }
 }
 
 pub async fn filter_verified_emails(

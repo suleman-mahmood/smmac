@@ -88,4 +88,16 @@ impl Sentinel {
             Reachable::Invalid => false,
         }
     }
+
+    pub async fn get_email_verification_status(&self, email: &str) -> Reachable {
+        let mut input = CheckEmailInput::new(email.to_string());
+        input
+            .set_from_email("random.guy@fit.com".to_string())
+            .set_hello_name("verywellfit.com".to_string());
+
+        // Verify this email, using async/await syntax.
+        let result = check_email(&input).await;
+
+        result.is_reachable
+    }
 }
