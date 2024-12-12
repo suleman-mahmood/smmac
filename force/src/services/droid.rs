@@ -5,7 +5,7 @@ use thirtyfour::{
 };
 use tokio::sync::Mutex;
 
-const NUM_PARALLEL_DRIVERS: u8 = 1_u8;
+const NUM_PARALLEL_DRIVERS: u8 = 10_u8;
 
 const PROXIES: [&str; 100] = [
     "69.12.93.165:6185",
@@ -140,6 +140,7 @@ pub async fn make_new_driver() -> WebDriver {
         no_proxy: None,
     };
     caps.set_proxy(proxy).unwrap();
+    caps.set_headless().unwrap();
 
     caps.add_experimental_option(
         "prefs",
