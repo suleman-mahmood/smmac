@@ -77,18 +77,17 @@ async fn get_leads_from_niche(
     log::info!("Total Raw Founders: {}", count);
     log::info!(">>> >>> >>>");
 
-    let raw_emails = construct_emails(&pool, domains).await.unwrap();
+    let raw_emails = construct_emails(&pool, domains).await;
 
-    // TODO: Verify all email permutations
+    log::info!(">>> >>> >>>");
+    log::info!("Constructed emails: {}", raw_emails.len());
+    log::info!(">>> >>> >>>");
 
-    // log::info!(">>> >>> >>>");
-    // log::info!("Constructed emails: {}", raw_emails.len());
-    // log::info!(">>> >>> >>>");
+    let emails = filter_verified_emails(sentinel, raw_emails).await;
 
-    // let emails = filter_verified_emails(sentinel, raw_emails).await;
+    // TODO: Add save status in db
 
-    // HttpResponse::Ok().body(format!("Verified emails: {:?}", emails))
-    HttpResponse::Ok().json(raw_emails)
+    HttpResponse::Ok().json(emails)
 }
 
 async fn get_product_search_queries(
@@ -542,7 +541,7 @@ pub struct FounderDomainEmail {
     pub email: String,
 }
 
-async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Result<Vec<String>, String> {
+pub async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Vec<String> {
     let founder_domains = lead_db::get_founder_domains(domains, pool).await.unwrap();
 
     let mut all_emails: Vec<String> = vec![];
@@ -564,16 +563,10 @@ async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Result<Vec<Str
         all_emails.extend(emails_db.iter().map(|e| e.email.clone()));
 
         // Save emails in db
-        if let Err(err) = lead_db::insert_emails(emails_db.clone(), pool).await {
-            log::error!(
-                "Error {:?} inserting emails permutations into db for input: {:?}",
-                err,
-                emails_db
-            )
-        }
+        let _ = lead_db::insert_emails(emails_db.clone(), pool).await;
     }
 
-    Ok(all_emails)
+    all_emails
 }
 
 fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
@@ -630,7 +623,10 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
     emails_db
 }
 
-async fn filter_verified_emails(sentinel: web::Data<Sentinel>, emails: Vec<String>) -> Vec<String> {
+pub async fn filter_verified_emails(
+    sentinel: web::Data<Sentinel>,
+    emails: Vec<String>,
+) -> Vec<String> {
     let mut verified_emails: Vec<String> = vec![];
 
     for em in emails {

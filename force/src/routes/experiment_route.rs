@@ -300,3 +300,26 @@ async fn verify_email(
         query.email, email_verified
     ))
 }
+
+#[get("/emails-step")]
+async fn emails_step(pool: web::Data<PgPool>, sentinel: web::Data<Sentinel>) -> HttpResponse {
+    let domains = sqlx::query_scalar!(
+        r#"
+        select
+            distinct domain
+        from
+            domain
+        "#
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .unwrap();
+
+    let domains: Vec<String> = domains.into_iter().flatten().collect();
+
+    let raw_emails = lead_route::construct_emails(&pool, domains).await;
+
+    let verified_emails = lead_route::filter_verified_emails(sentinel, raw_emails).await;
+
+    HttpResponse::Ok().json(verified_emails)
+}

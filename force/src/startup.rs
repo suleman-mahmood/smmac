@@ -42,7 +42,8 @@ pub fn run(
                     .service(experiment_route::extract_domain_from_candidate_url)
                     .service(experiment_route::recalculate_founder_names)
                     .service(experiment_route::get_valid_founder_names)
-                    .service(experiment_route::verify_email),
+                    .service(experiment_route::verify_email)
+                    .service(experiment_route::emails_step),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())
