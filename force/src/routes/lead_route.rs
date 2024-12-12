@@ -80,7 +80,7 @@ async fn get_leads_from_niche(
     log::info!("Constructed emails: {}", raw_emails.len());
     log::info!(">>> >>> >>>");
 
-    verify_emails(&pool, &sentinel, raw_emails).await;
+    verify_emails(pool, sentinel, raw_emails).await;
 
     HttpResponse::Ok().body("Done!")
 }
@@ -611,15 +611,36 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
     emails_db
 }
 
-async fn verify_emails(pool: &PgPool, sentinel: &Sentinel, emails: Vec<String>) {
-    for em in emails {
-        let reachable = sentinel.get_email_verification_status(&em).await;
-        let status = match reachable {
-            Reachable::Safe => EmailVerifiedStatus::Verified,
-            _ => EmailVerifiedStatus::Invalid,
-        };
-        let reachable: EmailReachability = reachable.into();
-        _ = lead_db::set_email_verification_reachability(&em, reachable, status, pool).await;
+async fn verify_emails(
+    pool: web::Data<PgPool>,
+    sentinel: web::Data<Sentinel>,
+    emails: Vec<String>,
+) {
+    const BATCH_SIZE: usize = 1000;
+
+    for batch in emails.chunks(BATCH_SIZE) {
+        let mut handles = Vec::new();
+
+        for em in batch {
+            let pool = pool.clone();
+            let sentinel = sentinel.clone();
+            let em = em.clone();
+
+            handles.push(tokio::spawn(async move {
+                let reachable = sentinel.get_email_verification_status(&em).await;
+                let status = match reachable {
+                    Reachable::Safe => EmailVerifiedStatus::Verified,
+                    _ => EmailVerifiedStatus::Invalid,
+                };
+                let reachable: EmailReachability = reachable.into();
+                _ = lead_db::set_email_verification_reachability(&em, reachable, status, &pool)
+                    .await;
+            }));
+        }
+
+        for handle in handles {
+            _ = handle.await;
+        }
     }
 }
 
