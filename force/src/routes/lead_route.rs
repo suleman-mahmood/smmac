@@ -82,8 +82,6 @@ async fn get_leads_from_niche(
 
     verify_emails(&pool, &sentinel, raw_emails).await;
 
-    // TODO: Add save status in db
-
     HttpResponse::Ok().body("Done!")
 }
 

@@ -316,9 +316,10 @@ async fn emails_step(pool: web::Data<PgPool>, sentinel: web::Data<Sentinel>) -> 
 
     let domains: Vec<String> = domains.into_iter().flatten().collect();
 
-    let raw_emails = lead_route::construct_emails(&pool, domains).await;
+    lead_route::construct_emails(&pool, domains).await;
 
-    let verified_emails = lead_route::filter_verified_emails(sentinel, raw_emails).await;
+    // let verified_emails = lead_route::filter_verified_emails(sentinel, raw_emails).await;
+    // HttpResponse::Ok().json(verified_emails)
 
-    HttpResponse::Ok().json(verified_emails)
+    HttpResponse::Ok().body("Done!")
 }

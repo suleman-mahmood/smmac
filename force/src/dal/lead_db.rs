@@ -348,14 +348,15 @@ pub async fn insert_emails(founder_domain_emails: Vec<FounderDomainEmail>, pool:
             _ = sqlx::query!(
                 r#"
                 insert into email
-                    (id, founder_id, email_address, verified_status)
+                    (id, founder_id, email_address, verified_status, reachability)
                 values
-                    ($1, $2, $3, $4)
+                    ($1, $2, $3, $4, $5)
                 "#,
                 Uuid::new_v4(),
                 founder_id,
                 fde.email,
                 EmailVerifiedStatus::Pending as EmailVerifiedStatus,
+                EmailReachability::Unknown as EmailReachability,
             )
             .execute(pool)
             .await;
