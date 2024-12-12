@@ -1,6 +1,4 @@
-use check_if_email_exists::{
-    check_email, CheckEmailInput, CheckEmailInputProxy, Reachable, SmtpSecurity,
-};
+use check_if_email_exists::{check_email, CheckEmailInput, Reachable};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 

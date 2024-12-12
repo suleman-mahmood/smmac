@@ -5,11 +5,7 @@ use itertools::Itertools;
 use rand::Rng;
 use serde::Deserialize;
 use sqlx::PgPool;
-use thirtyfour::{
-    error::WebDriverError,
-    prelude::{ElementQueryable, ElementWaitable},
-    By,
-};
+use thirtyfour::{error::WebDriverError, prelude::ElementQueryable, By};
 use url::Url;
 
 use crate::{
@@ -95,10 +91,8 @@ async fn get_product_search_queries(
     openai_client: &OpenaiClient,
     niche: &str,
 ) -> Vec<String> {
-    if let Ok(search_queries) = lead_db::get_product_search_queries(niche, pool).await {
-        if !search_queries.is_empty() {
-            return search_queries;
-        }
+    if let Ok(Some(search_queries)) = lead_db::get_product_search_queries(niche, pool).await {
+        return search_queries;
     }
 
     let products = openai_client
@@ -111,9 +105,7 @@ async fn get_product_search_queries(
         .map(|p| build_seach_url(p.to_string()))
         .collect();
 
-    lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool)
-        .await
-        .unwrap();
+    lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool).await;
 
     search_queries
 }
@@ -128,11 +120,9 @@ async fn get_urls_from_google_searches(
 
     for url in search_urls.into_iter() {
         // Fetch domain urls for url, if exist don't search
-        if let Ok(domains) = lead_db::get_domains(&url, pool).await {
-            if !domains.is_empty() {
-                all_domains.extend(domains);
-                continue;
-            }
+        if let Ok(Some(domains)) = lead_db::get_domains(&url, pool).await {
+            all_domains.extend(domains);
+            continue;
         };
 
         let mut current_url = url.clone();
@@ -403,17 +393,7 @@ async fn get_founders_from_google_searches(
 
                 // Save results to db
                 let founder_names = extract_founder_names(tag_candidate.clone());
-                if let Err(e) =
-                    lead_db::insert_founders(tag_candidate.clone(), founder_names, &domain, pool)
-                        .await
-                {
-                    log::error!(
-                        "Error inserting domain founders in db for domain: {} and candidates: {:?} and error {:?}",
-                        domain,
-                        tag_candidate,
-                        e
-                    )
-                }
+                lead_db::insert_founders(tag_candidate.clone(), founder_names, &domain, pool).await;
             }
         }
     }
@@ -542,31 +522,30 @@ pub struct FounderDomainEmail {
 }
 
 pub async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Vec<String> {
-    let founder_domains = lead_db::get_founder_domains(domains, pool).await.unwrap();
+    if let Ok(Some(founder_domains)) = lead_db::get_founder_domains(domains, pool).await {
+        let mut all_emails: Vec<String> = vec![];
 
-    let mut all_emails: Vec<String> = vec![];
-
-    for fd in founder_domains {
-        // Verify if already run
-        if let Ok(emails) = lead_db::get_raw_emails(fd.clone(), pool).await {
-            if !emails.is_empty() {
+        for fd in founder_domains {
+            // Verify if already run
+            if let Ok(Some(emails)) = lead_db::get_raw_emails(fd.clone(), pool).await {
                 all_emails.extend(emails);
                 continue;
             }
+
+            let emails_db = get_email_permutations(&fd.founder_name, &fd.domain);
+            if emails_db.is_empty() {
+                continue;
+            }
+
+            all_emails.extend(emails_db.iter().map(|e| e.email.clone()));
+
+            // Save emails in db
+            lead_db::insert_emails(emails_db.clone(), pool).await;
         }
 
-        let emails_db = get_email_permutations(&fd.founder_name, &fd.domain);
-        if emails_db.is_empty() {
-            continue;
-        }
-
-        all_emails.extend(emails_db.iter().map(|e| e.email.clone()));
-
-        // Save emails in db
-        let _ = lead_db::insert_emails(emails_db.clone(), pool).await;
+        return all_emails;
     }
-
-    all_emails
+    vec![]
 }
 
 fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {

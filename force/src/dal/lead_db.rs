@@ -9,8 +9,8 @@ use crate::routes::lead_route::{
 pub async fn get_product_search_queries(
     niche: &str,
     pool: &PgPool,
-) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar!(
+) -> Result<Option<Vec<String>>, sqlx::Error> {
+    let rows = sqlx::query_scalar!(
         r#"
         select
             domain_search_url
@@ -22,7 +22,12 @@ pub async fn get_product_search_queries(
         niche,
     )
     .fetch_all(pool)
-    .await
+    .await?;
+
+    match rows.is_empty() {
+        true => Ok(None),
+        false => Ok(Some(rows)),
+    }
 }
 
 pub async fn insert_niche_products(
@@ -30,9 +35,9 @@ pub async fn insert_niche_products(
     search_queries: Vec<String>,
     niche: &str,
     pool: &PgPool,
-) -> Result<(), sqlx::Error> {
+) {
     for (pro, search_query) in products.iter().zip(search_queries.iter()) {
-        sqlx::query!(
+        _ = sqlx::query!(
             r#"
             insert into product
                 (id, niche, product, domain_search_url)
@@ -45,12 +50,14 @@ pub async fn insert_niche_products(
             search_query,
         )
         .execute(pool)
-        .await?;
+        .await;
     }
-    Ok(())
 }
 
-pub async fn get_domains(product_url: &str, pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
+pub async fn get_domains(
+    product_url: &str,
+    pool: &PgPool,
+) -> Result<Option<Vec<String>>, sqlx::Error> {
     let domains = sqlx::query_scalar!(
         r#"
         select
@@ -65,8 +72,12 @@ pub async fn get_domains(product_url: &str, pool: &PgPool) -> Result<Vec<String>
     )
     .fetch_all(pool)
     .await?;
+    let domains: Vec<String> = domains.into_iter().flatten().collect();
 
-    Ok(domains.into_iter().flatten().collect())
+    match domains.is_empty() {
+        true => Ok(None),
+        false => Ok(Some(domains)),
+    }
 }
 
 pub async fn insert_domain_candidate_urls(
@@ -96,7 +107,7 @@ pub async fn insert_domain_candidate_urls(
         .zip(domains.iter())
         .zip(founders.iter())
     {
-        sqlx::query!(
+        _ = sqlx::query!(
             r#"
             insert into domain
                 (id, product_id, domain_candidate_url, domain, founder_search_url)
@@ -110,9 +121,9 @@ pub async fn insert_domain_candidate_urls(
             foun.clone()
         )
         .execute(pool)
-        .await?; // TODO: Ignore error silently
+        .await;
     }
-    Ok(())
+    return Ok(());
 }
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
@@ -160,7 +171,7 @@ pub async fn insert_founders(
     names: Vec<Option<String>>,
     domain: &str,
     pool: &PgPool,
-) -> Result<(), sqlx::Error> {
+) {
     for (ele, name) in founder.elements.into_iter().zip(names.into_iter()) {
         let content;
         let element_type = match ele {
@@ -174,7 +185,7 @@ pub async fn insert_founders(
             }
         };
 
-        sqlx::query!(
+        _ = sqlx::query!(
             r#"
             insert into founder
                 (id, domain, element_content, element_type, founder_name)
@@ -188,16 +199,16 @@ pub async fn insert_founders(
             name,
         )
         .execute(pool)
-        .await?;
+        .await;
     }
-    Ok(())
 }
 
 pub async fn get_founder_domains(
     domains: Vec<String>,
     pool: &PgPool,
-) -> Result<Vec<FounderDomain>, sqlx::Error> {
-    let record = sqlx::query!(
+) -> Result<Option<Vec<FounderDomain>>, sqlx::Error> {
+    let fds = sqlx::query_as!(
+        FounderDomain,
         r#"
         select
             founder_name,
@@ -205,29 +216,24 @@ pub async fn get_founder_domains(
         from
             founder
         where
-            domain = any($1) and
-            domain is not null and
-            founder_name is not null
+            domain = any($1)
         "#,
         &domains,
     )
     .fetch_all(pool)
     .await?;
 
-    Ok(record
-        .into_iter()
-        .map(|row| FounderDomain {
-            founder_name: row.founder_name.unwrap(),
-            domain: row.domain.unwrap(),
-        })
-        .collect())
+    match fds.is_empty() {
+        true => Ok(None),
+        false => Ok(Some(fds)),
+    }
 }
 
 pub async fn get_raw_emails(
     founder_domain: FounderDomain,
     pool: &PgPool,
-) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar!(
+) -> Result<Option<Vec<String>>, sqlx::Error> {
+    let emails = sqlx::query_scalar!(
         r#"
         select
             e.email_address
@@ -242,7 +248,12 @@ pub async fn get_raw_emails(
         founder_domain.founder_name,
     )
     .fetch_all(pool)
-    .await
+    .await?;
+
+    match emails.is_empty() {
+        true => Ok(None),
+        false => Ok(Some(emails)),
+    }
 }
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
@@ -252,10 +263,7 @@ enum EmailVerifiedStatus {
     Verified,
     Invalid,
 }
-pub async fn insert_emails(
-    founder_domain_emails: Vec<FounderDomainEmail>,
-    pool: &PgPool,
-) -> Result<(), sqlx::Error> {
+pub async fn insert_emails(founder_domain_emails: Vec<FounderDomainEmail>, pool: &PgPool) {
     for fde in founder_domain_emails {
         let founder_id = sqlx::query_scalar!(
             r#"
@@ -265,28 +273,23 @@ pub async fn insert_emails(
             fde.founder_name,
         )
         .fetch_optional(pool)
-        .await?;
+        .await;
 
-        if founder_id.is_none() {
-            continue;
+        if let Ok(Some(founder_id)) = founder_id {
+            _ = sqlx::query!(
+                r#"
+                insert into email
+                    (id, founder_id, email_address, verified_status)
+                values
+                    ($1, $2, $3, $4)
+                "#,
+                Uuid::new_v4(),
+                founder_id,
+                fde.email,
+                EmailVerifiedStatus::Pending as EmailVerifiedStatus,
+            )
+            .execute(pool)
+            .await;
         }
-        let founder_id = founder_id.unwrap();
-
-        sqlx::query!(
-            r#"
-            insert into email
-                (id, founder_id, email_address, verified_status)
-            values
-                ($1, $2, $3, $4)
-            "#,
-            Uuid::new_v4(),
-            founder_id,
-            fde.email,
-            EmailVerifiedStatus::Pending as EmailVerifiedStatus,
-        )
-        .execute(pool)
-        .await?;
     }
-
-    Ok(())
 }

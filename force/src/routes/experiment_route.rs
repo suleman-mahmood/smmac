@@ -199,14 +199,14 @@ async fn extract_domain_from_candidate_url(pool: web::Data<PgPool>) -> HttpRespo
     HttpResponse::Ok().body("Done!")
 }
 
-struct element_with_id {
+struct ElementWithId {
     fe: lead_route::FounderElement,
     id: Uuid,
 }
 
 #[get("/re-calculate-founder-names")]
 async fn recalculate_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
-    let elements: Vec<element_with_id> = sqlx::query!(
+    let elements: Vec<ElementWithId> = sqlx::query!(
         r#"
         select
             id,
@@ -221,11 +221,11 @@ async fn recalculate_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
     .unwrap()
     .into_iter()
     .map(|r| match r.element_type {
-        ElementType::Span => element_with_id {
+        ElementType::Span => ElementWithId {
             fe: lead_route::FounderElement::Span(r.element_content),
             id: r.id,
         },
-        ElementType::HThree => element_with_id {
+        ElementType::HThree => ElementWithId {
             fe: lead_route::FounderElement::H3(r.element_content),
             id: r.id,
         },
@@ -273,7 +273,6 @@ async fn get_valid_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
     .await
     .unwrap();
 
-    let elements: Vec<String> = elements.into_iter().flatten().collect();
     let elements: Vec<String> = elements
         .into_iter()
         .filter(|name| name.split(" ").collect_vec().len() == 2)
