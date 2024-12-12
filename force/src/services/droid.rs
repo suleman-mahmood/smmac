@@ -1,3 +1,4 @@
+use fake_user_agent::get_rua;
 use rand::seq::SliceRandom;
 use serde_json::json;
 use thirtyfour::{
@@ -5,7 +6,7 @@ use thirtyfour::{
 };
 use tokio::sync::Mutex;
 
-const NUM_PARALLEL_DRIVERS: u8 = 10_u8;
+const NUM_PARALLEL_DRIVERS: u8 = 20_u8;
 
 const PROXIES: [&str; 100] = [
     "69.12.93.165:6185",
@@ -174,11 +175,11 @@ pub async fn make_new_driver() -> WebDriver {
     )
     .unwrap();
 
-    // caps.add_arg("start-maximized").unwrap();
-    // caps.add_arg("disable-infobars").unwrap();
-    // caps.add_arg("--disable-extensions").unwrap();
-    // caps.add_arg(&format!("--user-agent={}", get_rua()))
-    //     .unwrap();
+    caps.add_arg("start-maximized").unwrap();
+    caps.add_arg("disable-infobars").unwrap();
+    caps.add_arg("--disable-extensions").unwrap();
+    caps.add_arg(&format!("--user-agent={}", get_rua()))
+        .unwrap();
 
     // http://chrome:4444/wd/hub
     // http://localhost:63364
