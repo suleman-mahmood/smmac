@@ -18,7 +18,8 @@ pub async fn get_product_search_queries(
         from
             product
         where
-            niche = $1
+            niche = $1 and
+            no_results = false
         "#,
         niche,
     )
@@ -76,7 +77,25 @@ pub async fn get_domains(
     let domains: Vec<String> = domains.into_iter().flatten().collect();
 
     match domains.is_empty() {
-        true => Ok(None),
+        true => {
+            let no_results = sqlx::query_scalar!(
+                "select no_results from product where domain_search_url = $1",
+                product_url
+            )
+            .fetch_optional(pool)
+            .await?;
+
+            match no_results {
+                Some(nr) => {
+                    if nr {
+                        Ok(Some(vec![]))
+                    } else {
+                        Ok(None)
+                    }
+                }
+                None => Ok(None),
+            }
+        }
         false => Ok(Some(domains)),
     }
 }
@@ -86,6 +105,7 @@ pub async fn insert_domain_candidate_urls(
     domains: Vec<Option<String>>,
     founders: Vec<Option<String>>,
     search_url: &str,
+    not_found: bool,
     pool: &PgPool,
 ) -> Result<(), sqlx::Error> {
     let product_id = sqlx::query_scalar!(
@@ -102,6 +122,16 @@ pub async fn insert_domain_candidate_urls(
         return Ok(());
     }
     let product_id = product_id.unwrap();
+
+    if not_found {
+        sqlx::query!(
+            "update product set no_results = true where domain_search_url = $1",
+            search_url,
+        )
+        .execute(pool)
+        .await?;
+        return Ok(());
+    }
 
     for ((domain_url, dom), foun) in domain_urls_list
         .iter()
@@ -124,7 +154,7 @@ pub async fn insert_domain_candidate_urls(
         .execute(pool)
         .await;
     }
-    return Ok(());
+    Ok(())
 }
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
@@ -145,7 +175,8 @@ pub async fn get_founder_tags(
         from
             founder
         where
-            domain = $1
+            domain = $1 and
+            no_results = false
         "#,
         domain,
     )
@@ -153,7 +184,21 @@ pub async fn get_founder_tags(
     .await?;
 
     if rows.is_empty() {
-        return Ok(None);
+        let no_results =
+            sqlx::query_scalar!("select no_results from founder where domain = $1", domain)
+                .fetch_optional(pool)
+                .await?;
+
+        return match no_results {
+            Some(nr) => {
+                if nr {
+                    Ok(Some(vec![]))
+                } else {
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
+        };
     }
 
     let elements = rows
@@ -165,6 +210,28 @@ pub async fn get_founder_tags(
         .collect();
 
     Ok(Some(elements))
+}
+
+pub async fn insert_domain_no_results(
+    domain: &str,
+    pool: &PgPool,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        r#"
+        insert into founder
+            (id, domain, element_content, element_type, founder_name, no_results)
+        values
+            ($1, $2, $3, $4, $5, $6)
+        "#,
+        Uuid::new_v4(),
+        domain,
+        "no-content",
+        ElementType::Span as ElementType,
+        "no-content",
+        true,
+    )
+    .execute(pool)
+    .await
 }
 
 pub async fn insert_founders(

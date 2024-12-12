@@ -128,6 +128,7 @@ async fn get_urls_from_google_searches(
 
         let mut current_url = url.clone();
         let mut domain_urls_list: Vec<String> = vec![];
+        let mut not_found = false;
 
         for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
             match extract_data_from_google_search(
@@ -137,7 +138,10 @@ async fn get_urls_from_google_searches(
             )
             .await?
             {
-                GoogleSearchResult::NotFound => break,
+                GoogleSearchResult::NotFound => {
+                    not_found = true;
+                    break;
+                }
                 GoogleSearchResult::Founders(_) => {
                     log::error!("Returning founders from domain google search");
                     break;
@@ -154,6 +158,8 @@ async fn get_urls_from_google_searches(
                 }
             }
         }
+
+        not_found = domain_urls_list.is_empty() && not_found;
 
         let domains: Vec<Option<String>> = domain_urls_list
             .iter()
@@ -175,6 +181,7 @@ async fn get_urls_from_google_searches(
             domains,
             founder_search_urls,
             &url,
+            not_found,
             pool,
         )
         .await
@@ -384,7 +391,10 @@ async fn get_founders_from_google_searches(
         )
         .await?
         {
-            GoogleSearchResult::NotFound => continue,
+            GoogleSearchResult::NotFound => {
+                let _ = lead_db::insert_domain_no_results(&domain, pool).await;
+                continue;
+            }
             GoogleSearchResult::Domains { .. } => {
                 log::error!("Returning domains from founder google search");
                 continue;
