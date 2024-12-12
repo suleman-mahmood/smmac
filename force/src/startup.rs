@@ -43,7 +43,8 @@ pub fn run(
                     .service(experiment_route::recalculate_founder_names)
                     .service(experiment_route::get_valid_founder_names)
                     .service(experiment_route::verify_email)
-                    .service(experiment_route::emails_step),
+                    .service(experiment_route::emails_step)
+                    .service(experiment_route::no_driver_scrape),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())

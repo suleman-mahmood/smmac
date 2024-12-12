@@ -1,7 +1,8 @@
 use actix_web::{get, web, HttpResponse};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
-use serde::Deserialize;
+use scraper::{selectable::Selectable, Html, Selector};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 use uuid::Uuid;
@@ -322,4 +323,61 @@ async fn emails_step(pool: web::Data<PgPool>, sentinel: web::Data<Sentinel>) -> 
     // HttpResponse::Ok().json(verified_emails)
 
     HttpResponse::Ok().body("Done!")
+}
+
+#[derive(Serialize)]
+struct GoogleQuery {
+    q: String,
+}
+
+#[get("/no-driver-scrape")]
+async fn no_driver_scrape() -> HttpResponse {
+    let url = "https://www.google.com/search";
+    let client = reqwest::Client::new();
+    let query = GoogleQuery {
+        q: r#""Organic Quinoa" AND "buy now""#.to_string(),
+    };
+
+    match client.get(url).query(&query).send().await {
+        Ok(res) => {
+            let html_content = res.text().await.unwrap();
+            let html_document = Html::parse_document(&html_content);
+
+            let a_tag_selector = Selector::parse("a").unwrap();
+            let footer_selector = Selector::parse("footer").unwrap();
+            let h3_selector = Selector::parse("h3").unwrap();
+
+            let links: Vec<Option<&str>> = html_document
+                .select(&a_tag_selector)
+                .map(|tag| tag.value().attr("href"))
+                .collect();
+
+            let next_page = html_document
+                .select(&footer_selector)
+                .next()
+                .unwrap()
+                .select(&a_tag_selector)
+                .next()
+                .unwrap()
+                .attr("href");
+
+            let headings: Vec<String> = html_document
+                .select(&h3_selector)
+                .map(|tag| tag.text().collect())
+                .collect();
+
+            // let next_page = html_document
+            //     .select(&a_tag_selector)
+            //     .find(|tag| tag.value().attr("id") == Some("pnnext"));
+
+            // for ele in html_document.select(&a_tag_selector) {
+            //     log::info!("Got link: {:?}", ele);
+            // }
+
+            HttpResponse::Ok().json(headings)
+            // HttpResponse::Ok().body(html_content)
+            // HttpResponse::Ok().body("Done")
+        }
+        Err(e) => HttpResponse::Ok().body(format!("Got error: {:?}", e)),
+    }
 }

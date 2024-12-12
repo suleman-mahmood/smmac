@@ -29,6 +29,7 @@ url = "2.5"
 itertools = "0.13"
 fake_user_agent = "0.2"
 check-if-email-exists = "0.9"
+scraper = "0.22"
 
 [dependencies.sqlx]
 version = "0.8"
