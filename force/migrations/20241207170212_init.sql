@@ -13,27 +13,26 @@ create table product (
 	id uuid primary key,
 	niche text not null,
 	product text not null,
-	domain_search_url text not null, -- make unique
+	domain_search_url text not null,
 	created_at timestamptz not null default now()
 );
 
 create table domain (
 	id uuid primary key,
 	product_id uuid not null references product(id),
-	domain_candidate_url text not null, -- make unique
-	domain text, -- duplicates
-	founder_search_url text, -- duplicates
+	domain_candidate_url text not null,
+	domain text,
+	founder_search_url text,
 	created_at timestamptz not null default now()
 );
 
 create table founder (
 	id uuid primary key,
-	domain text, -- duplicates
+	domain text,
 	element_content text not null,
 	element_type ElementType not null,
-	founder_name text, -- duplicates
+	founder_name text,
 	created_at timestamptz not null default now()
-	-- make founder_name and domain unique
 );
 
 create table email (
