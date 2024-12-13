@@ -52,11 +52,13 @@ async fn get_leads_from_niche(
     }
     let domains = domains_result.unwrap();
 
+    log::info!(">>> >>> >>>");
     log::info!(
         "Got {} unique domains for niche {}",
         domains.len(),
         &body.niche
     );
+    log::info!(">>> >>> >>>");
 
     save_founders_from_google_searches_batch(&pool, domains.clone()).await;
 
