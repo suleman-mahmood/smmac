@@ -311,10 +311,8 @@ async fn extract_data_from_google_search_with_reqwest(
                 }
             }
             Err(e) => {
-                return Err(WebDriverError::RequestFailed(format!(
-                    "No response from reqwest, error: {:?}",
-                    e
-                )))
+                log::error!("No response from reqwest, error: {:?}", e);
+                retry_count += 1;
             }
         }
     }
