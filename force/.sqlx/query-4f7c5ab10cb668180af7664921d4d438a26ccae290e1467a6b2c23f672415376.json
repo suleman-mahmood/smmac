@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select no_results from founder where domain = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "no_results",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4f7c5ab10cb668180af7664921d4d438a26ccae290e1467a6b2c23f672415376"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        select\n            founder_name,\n            domain\n        from\n            founder\n        where\n            domain = any($1) and\n            domain is not null and\n            founder_name is not null\n        ",
+  "query": "\n        select\n            founder_name,\n            domain\n        from\n            founder\n        where\n            domain = any($1) and\n            founder_name is not null\n        ",
   "describe": {
     "columns": [
       {
@@ -21,8 +21,8 @@
     },
     "nullable": [
       true,
-      true
+      false
     ]
   },
-  "hash": "ff35072010f271b378d94d73d7d9d7d48761bf3845f45bb4f8acb9d71f3a7a89"
+  "hash": "5fd0c0f876ead59752e0aaac13a0dc6cf220209b63240d3911424c7ab437e240"
 }

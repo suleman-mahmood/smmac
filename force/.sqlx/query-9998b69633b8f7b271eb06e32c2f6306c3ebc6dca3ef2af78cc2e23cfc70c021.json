@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            distinct e.email_address\n        from\n            email e\n            join founder f on f.id = e.founder_id\n            join domain d on d.domain = f.domain\n            join product p on p.id = d.product_id\n        where\n            p.niche = $1 and\n            e.verified_status = 'VERIFIED'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email_address",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9998b69633b8f7b271eb06e32c2f6306c3ebc6dca3ef2af78cc2e23cfc70c021"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update product set no_results = true where domain_search_url = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b1627b8ee400fbc02e832f65cba0e5d566663478d3d26c8d221e6a01ba3ff43e"
+}
