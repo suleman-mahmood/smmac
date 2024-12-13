@@ -15,7 +15,7 @@ use crate::{
     services::{get_random_proxy, make_new_driver, Droid, OpenaiClient, Sentinel},
 };
 
-const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
+const DEPTH_GOOGLE_SEACH_PAGES: u8 = 5; // Should be > 0
 const NUM_CAPTCHA_RETRIES: u8 = 100; // Should be > 0
 
 #[derive(Deserialize)]
