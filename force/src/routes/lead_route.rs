@@ -16,7 +16,7 @@ use crate::{
 };
 
 const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
-const NUM_CAPTCHA_RETRIES: u8 = 50; // Should be > 0
+const NUM_CAPTCHA_RETRIES: u8 = 100; // Should be > 0
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -60,19 +60,7 @@ async fn get_leads_from_niche(
         &body.niche
     );
 
-    let raw_founders_result = get_founders_from_google_searches(&pool, domains.clone()).await;
-    if let Err(error) = raw_founders_result {
-        return HttpResponse::Ok().body(format!(
-            "Got webdriver error from founder google searches: {:?}",
-            error
-        ));
-    }
-    let raw_founders = raw_founders_result.unwrap();
-    let count = raw_founders.iter().fold(0, |acc, x| acc + x.elements.len());
-
-    log::info!(">>> >>> >>>");
-    log::info!("Total Raw Founders: {}", count);
-    log::info!(">>> >>> >>>");
+    save_founders_from_google_searches_batch(&pool, domains.clone()).await;
 
     let raw_emails = construct_emails(&pool, domains).await;
 
@@ -473,6 +461,58 @@ pub enum FounderElement {
 pub struct FounderTagCandidate {
     pub elements: Vec<FounderElement>, // TODO: Change this to return vec of names
     pub domain: String,
+}
+
+async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<String>) {
+    const BATCH_SIZE: usize = 100;
+
+    for batch in domains.chunks(BATCH_SIZE) {
+        let mut handles = Vec::new();
+
+        for domain in batch {
+            let pool = pool.clone();
+            let domain = domain.clone();
+
+            handles.push(tokio::spawn(async move {
+                if let Ok(Some(_)) = lead_db::get_founder_tags(&domain, &pool).await {
+                } else {
+                    // TODO: Fetch query / url from db instead
+                    let query = build_founder_seach_query(domain.clone());
+
+                    if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
+                        query.to_string(),
+                        GoogleSearchType::Founder(domain.to_string()),
+                    )
+                    .await
+                    {
+                        match google_search_result {
+                            GoogleSearchResult::NotFound => {
+                                let _ = lead_db::insert_domain_no_results(&domain, &pool).await;
+                            }
+                            GoogleSearchResult::Domains { .. } => {
+                                log::error!("Returning domains from founder google search");
+                            }
+                            GoogleSearchResult::Founders(tag_candidate) => {
+                                // Save results to db
+                                let founder_names = extract_founder_names(tag_candidate.clone());
+                                lead_db::insert_founders(
+                                    tag_candidate.clone(),
+                                    founder_names,
+                                    &domain,
+                                    &pool,
+                                )
+                                .await;
+                            }
+                        }
+                    }
+                }
+            }));
+        }
+
+        for handle in handles {
+            _ = handle.await;
+        }
+    }
 }
 
 async fn get_founders_from_google_searches(
