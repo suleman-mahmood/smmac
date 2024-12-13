@@ -36,9 +36,10 @@ impl OpenaiClient {
                 .content(format!(
                     r#"
                     Give different names for the following product: {}
-                    For example for product "yoga mat" similar products will be like: yoga block, silk yoga mat, yellow yoga mat, yoga mat bag, workout mat
+                    For example for product "yoga mat" similar products will be like: yoga block, silk yoga mat, yellow yoga mat, yoga mat bag, workout mat.
                     Only return 3 product names in a list but don't start with a bullet point.
                     Do not give numbers to products.
+                    Give each product on a new line.
                     "#,
                     niche
                 ))
