@@ -12,11 +12,11 @@ use url::Url;
 
 use crate::{
     dal::lead_db::{self, EmailReachability, EmailVerifiedStatus},
-    services::{make_new_driver, Droid, OpenaiClient, Sentinel},
+    services::{get_random_proxy, make_new_driver, Droid, OpenaiClient, Sentinel},
 };
 
 const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
-const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
+const NUM_CAPTCHA_RETRIES: u8 = 50; // Should be > 0
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -128,6 +128,7 @@ async fn get_urls_from_google_searches(
         let mut not_found = false;
 
         for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
+            // TODO: fix next page url, query
             match extract_data_from_google_search_with_reqwest(
                 query.clone(),
                 GoogleSearchType::Domain,
@@ -148,6 +149,7 @@ async fn get_urls_from_google_searches(
                 } => {
                     domain_urls_list.extend(domain_urls);
                     match next_page_url {
+                        // TODO: Don't set query as next page url
                         Some(next_page_url) => query = next_page_url,
                         None => break,
                     }
@@ -226,8 +228,16 @@ async fn extract_data_from_google_search_with_reqwest(
     let mut retry_count = 0;
 
     while retry_count < NUM_CAPTCHA_RETRIES {
-        // TODO: Add rotation proxy here
-        let client = reqwest::Client::new();
+        let proxy = get_random_proxy();
+        let http_proxy = reqwest::Proxy::http(proxy.clone()).unwrap();
+        let https_proxy = reqwest::Proxy::https(proxy.clone()).unwrap();
+
+        let client = reqwest::Client::builder()
+            .proxy(http_proxy)
+            .proxy(https_proxy)
+            .build()
+            .unwrap();
+
         let query = GoogleQuery { q: query.clone() };
 
         match client.get(GOOGLE_URL).query(&query).send().await {

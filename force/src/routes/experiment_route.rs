@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     dal::lead_db::ElementType,
-    services::{Droid, OpenaiClient, Sentinel},
+    services::{get_random_proxy, Droid, OpenaiClient, Sentinel},
 };
 
 use super::lead_route;
@@ -128,6 +128,33 @@ async fn check_ip_address(droid: web::Data<Droid>) -> HttpResponse {
     }
 
     HttpResponse::Ok().body("Ok!")
+}
+
+#[get("/check-ip-address-reqwest")]
+async fn check_ip_address_request() -> HttpResponse {
+    // let http_proxy = reqwest::Proxy::http("http://p.webshare.io:9999/").unwrap();
+    // let https_proxy = reqwest::Proxy::http("https://p.webshare.io:9999/").unwrap();
+
+    let proxy = get_random_proxy();
+    let http_proxy = reqwest::Proxy::http(proxy.clone()).unwrap();
+    let https_proxy = reqwest::Proxy::https(proxy.clone()).unwrap();
+
+    let client = reqwest::Client::builder()
+        .proxy(http_proxy)
+        .proxy(https_proxy)
+        .build()
+        .unwrap();
+
+    let html_content = client
+        .get("https://www.iplocation.net/find-ip-address")
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    HttpResponse::Ok().body(html_content)
 }
 
 #[derive(Deserialize)]
@@ -273,6 +300,7 @@ async fn get_valid_founder_names(pool: web::Data<PgPool>) -> HttpResponse {
     .fetch_all(pool.as_ref())
     .await
     .unwrap();
+    let elements: Vec<String> = elements.into_iter().flatten().collect();
 
     let elements: Vec<String> = elements
         .into_iter()

@@ -275,8 +275,7 @@ pub async fn get_founder_domains(
     domains: Vec<String>,
     pool: &PgPool,
 ) -> Result<Option<Vec<FounderDomain>>, sqlx::Error> {
-    let fds = sqlx::query_as!(
-        FounderDomain,
+    let records = sqlx::query!(
         r#"
         select
             founder_name,
@@ -284,16 +283,28 @@ pub async fn get_founder_domains(
         from
             founder
         where
-            domain = any($1)
+            domain = any($1) and
+            founder_name is not null
         "#,
         &domains,
     )
     .fetch_all(pool)
     .await?;
 
-    match fds.is_empty() {
+    match records.is_empty() {
         true => Ok(None),
-        false => Ok(Some(fds)),
+        false => {
+            let mut fds = Vec::new();
+            records.into_iter().for_each(|row| {
+                if let Some(name) = row.founder_name {
+                    fds.push(FounderDomain {
+                        founder_name: name,
+                        domain: row.domain,
+                    });
+                }
+            });
+            Ok(Some(fds))
+        }
     }
 }
 

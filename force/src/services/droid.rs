@@ -128,6 +128,10 @@ impl Droid {
     }
 }
 
+pub fn get_random_proxy() -> String {
+    PROXIES.choose(&mut rand::thread_rng()).unwrap().to_string()
+}
+
 pub async fn make_new_driver() -> WebDriver {
     let mut caps = DesiredCapabilities::chrome();
     let proxy = Proxy::Manual {
