@@ -69,7 +69,10 @@ async fn get_leads_from_niche(
     verify_emails(&pool, sentinel, raw_emails).await;
 
     match lead_db::get_verified_emails_for_niche(&body.niche, &pool).await {
-        Ok(verified_emails) => HttpResponse::Ok().json(verified_emails),
+        Ok(verified_emails) => match verified_emails.is_empty() {
+            true => HttpResponse::Ok().body("No verified emails found"),
+            false => HttpResponse::Ok().json(verified_emails),
+        },
         Err(e) => {
             log::error!("Error getting verified emails from db: {:?}", e);
             HttpResponse::Ok().body("Done!")
