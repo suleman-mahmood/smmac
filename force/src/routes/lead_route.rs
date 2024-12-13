@@ -44,7 +44,7 @@ async fn get_leads_from_niche(
     let domain_search_queries =
         get_product_search_queries(&pool, &openai_client, &body.niche).await;
 
-    _ = get_urls_from_google_searches(&pool, domain_search_queries).await;
+    save_urls_from_google_searche_batch(&pool, domain_search_queries).await;
 
     let domains_result = lead_db::get_domains_for_niche(&body.niche, &pool).await;
     if let Err(error) = domains_result {
@@ -93,6 +93,94 @@ async fn get_product_search_queries(
     lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool).await;
 
     search_queries
+}
+
+async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<String>) {
+    const BATCH_SIZE: usize = 100;
+
+    for batch in search_queries.chunks(BATCH_SIZE) {
+        let mut handles = Vec::new();
+
+        for query in batch {
+            let pool = pool.clone();
+            let query = query.clone();
+
+            handles.push(tokio::spawn(async move {
+                // Fetch domain urls for url, if exist don't search
+                if let Ok(Some(_)) = lead_db::get_domains_for_product(&query, &pool).await {
+                } else {
+                    let mut current_url = None;
+                    let mut domain_urls_list: Vec<String> = vec![];
+                    let mut not_found = false;
+
+                    for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
+                        if let Ok(google_search_result) =
+                            extract_data_from_google_search_with_reqwest(
+                                query.clone(),
+                                GoogleSearchType::Domain(current_url.clone()),
+                            )
+                            .await
+                        {
+                            match google_search_result {
+                                GoogleSearchResult::NotFound => {
+                                    not_found = true;
+                                    break;
+                                }
+                                GoogleSearchResult::Founders(_) => {
+                                    log::error!("Returning founders from domain google search");
+                                    break;
+                                }
+                                GoogleSearchResult::Domains {
+                                    domain_urls,
+                                    next_page_url,
+                                } => {
+                                    domain_urls_list.extend(domain_urls);
+                                    match next_page_url {
+                                        Some(url) => current_url = Some(url),
+                                        None => break,
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    not_found = domain_urls_list.is_empty() && not_found;
+
+                    let domains: Vec<Option<String>> = domain_urls_list
+                        .iter()
+                        .map(|url| get_domain_from_url(url))
+                        .collect();
+                    let founder_search_queries: Vec<Option<String>> = domains
+                        .clone()
+                        .into_iter()
+                        .map(|dom| dom.map(build_founder_seach_query))
+                        .collect();
+
+                    // Save domain entries
+                    if let Err(e) = lead_db::insert_domain_candidate_urls(
+                        domain_urls_list,
+                        domains,
+                        founder_search_queries,
+                        &query,
+                        not_found,
+                        &pool,
+                    )
+                    .await
+                    {
+                        log::error!(
+                        "Error inserting domain candidate urls in db for url: {} and error: {:?}",
+                        query,
+                        e
+                    )
+                    }
+                }
+            }));
+        }
+
+        for handle in handles {
+            _ = handle.await;
+        }
+    }
 }
 
 async fn get_urls_from_google_searches(
