@@ -366,13 +366,8 @@ async fn no_driver_scrape() -> HttpResponse {
                 .map(|tag| tag.text().collect())
                 .collect();
 
-            // let next_page = html_document
-            //     .select(&a_tag_selector)
-            //     .find(|tag| tag.value().attr("id") == Some("pnnext"));
-
-            // for ele in html_document.select(&a_tag_selector) {
-            //     log::info!("Got link: {:?}", ele);
-            // }
+            let no_results = html_content.contains("did not match any documents");
+            let captcha_blocked = !no_results;
 
             HttpResponse::Ok().json(headings)
             // HttpResponse::Ok().body(html_content)
