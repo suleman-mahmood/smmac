@@ -169,16 +169,16 @@ async fn extract_domain_from_candidate_url(pool: web::Data<PgPool>) -> HttpRespo
         .map(|url| lead_route::get_domain_from_url(url))
         .collect();
 
-    let founder_search_urls: Vec<Option<String>> = domains
+    let founder_search_queries: Vec<Option<String>> = domains
         .clone()
         .into_iter()
-        .map(|dom| dom.map(lead_route::build_founder_seach_url))
+        .map(|dom| dom.map(lead_route::build_founder_seach_query))
         .collect();
 
-    for ((url, dom), new_url) in candidate_urls
+    for ((url, dom), new_query) in candidate_urls
         .into_iter()
         .zip(domains.into_iter())
-        .zip(founder_search_urls.into_iter())
+        .zip(founder_search_queries.into_iter())
     {
         sqlx::query!(
             r#"
@@ -190,7 +190,7 @@ async fn extract_domain_from_candidate_url(pool: web::Data<PgPool>) -> HttpRespo
             "#,
             url,
             dom,
-            new_url,
+            new_query,
         )
         .execute(pool.as_ref())
         .await
