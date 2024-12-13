@@ -599,16 +599,14 @@ pub fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Opti
                     strategies.iter().map(|st| st.to_lowercase()).collect();
                 let content = content.to_lowercase();
 
-                let first_match = strategies
+                strategies
                     .iter()
                     .filter_map(|st| {
                         content
                             .split_once(st)
                             .map(|parts| parts.0.trim().to_string())
                     })
-                    .next();
-
-                first_match
+                    .next()
             }
         })
         .collect()
