@@ -123,15 +123,14 @@ async fn get_urls_from_google_searches(
             continue;
         };
 
-        let mut query = query.clone();
+        let mut current_url = None;
         let mut domain_urls_list: Vec<String> = vec![];
         let mut not_found = false;
 
         for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
-            // TODO: fix next page url, query
             match extract_data_from_google_search_with_reqwest(
                 query.clone(),
-                GoogleSearchType::Domain,
+                GoogleSearchType::Domain(current_url.clone()),
             )
             .await?
             {
@@ -149,8 +148,7 @@ async fn get_urls_from_google_searches(
                 } => {
                     domain_urls_list.extend(domain_urls);
                     match next_page_url {
-                        // TODO: Don't set query as next page url
-                        Some(next_page_url) => query = next_page_url,
+                        Some(url) => current_url = Some(url),
                         None => break,
                     }
                 }
@@ -198,7 +196,7 @@ async fn get_urls_from_google_searches(
 }
 
 enum GoogleSearchType {
-    Domain,
+    Domain(Option<String>),
     Founder(String),
 }
 
@@ -237,10 +235,17 @@ async fn extract_data_from_google_search_with_reqwest(
             .proxy(https_proxy)
             .build()
             .unwrap();
-
         let query = GoogleQuery { q: query.clone() };
 
-        match client.get(GOOGLE_URL).query(&query).send().await {
+        let req = match search_type {
+            GoogleSearchType::Domain(Some(ref next_page_url)) => {
+                let url = format!("https://www.google.com{}", next_page_url);
+                client.get(url)
+            }
+            _ => client.get(GOOGLE_URL).query(&query),
+        };
+
+        match req.send().await {
             Ok(res) => {
                 let html_content = res.text().await.unwrap();
                 let html_document = Html::parse_document(&html_content);
@@ -262,7 +267,7 @@ async fn extract_data_from_google_search_with_reqwest(
                         }
                     },
                     false => match search_type {
-                        GoogleSearchType::Domain => {
+                        GoogleSearchType::Domain(_) => {
                             let links: Vec<String> = html_document
                                 .select(&a_tag_selector)
                                 .filter_map(|tag| {
@@ -276,9 +281,7 @@ async fn extract_data_from_google_search_with_reqwest(
                                 .and_then(|footer| {
                                     footer.select(&a_tag_selector).next().and_then(
                                         |next_page_a_tag| {
-                                            next_page_a_tag
-                                                .attr("href")
-                                                .map(|url| format!("https://www.google.com{}", url))
+                                            next_page_a_tag.attr("href").map(|url| url.to_string())
                                         },
                                     )
                                 });
@@ -373,7 +376,7 @@ async fn extract_data_from_google_search(
             Ok(exists) => {
                 if exists {
                     match search_type {
-                        GoogleSearchType::Domain => {
+                        GoogleSearchType::Domain(_) => {
                             let mut domain_urls: Vec<String> = vec![];
                             let mut next_page_url = None;
 
