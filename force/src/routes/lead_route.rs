@@ -66,9 +66,15 @@ async fn get_leads_from_niche(
     log::info!("Constructed emails: {}", raw_emails.len());
     log::info!(">>> >>> >>>");
 
-    verify_emails(pool, sentinel, raw_emails).await;
+    verify_emails(&pool, sentinel, raw_emails).await;
 
-    HttpResponse::Ok().body("Done!")
+    match lead_db::get_verified_emails_for_niche(&body.niche, &pool).await {
+        Ok(verified_emails) => HttpResponse::Ok().json(verified_emails),
+        Err(e) => {
+            log::error!("Error getting verified emails from db: {:?}", e);
+            HttpResponse::Ok().body("Done!")
+        }
+    }
 }
 
 async fn get_product_search_queries(
@@ -843,11 +849,7 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
     emails_db
 }
 
-async fn verify_emails(
-    pool: web::Data<PgPool>,
-    sentinel: web::Data<Sentinel>,
-    emails: Vec<String>,
-) {
+async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec<String>) {
     const BATCH_SIZE: usize = 1000;
 
     for batch in emails.chunks(BATCH_SIZE) {

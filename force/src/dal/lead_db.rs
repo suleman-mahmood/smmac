@@ -437,3 +437,26 @@ pub async fn set_email_verification_reachability(
     .execute(pool)
     .await
 }
+
+pub async fn get_verified_emails_for_niche(
+    niche: &str,
+    pool: &PgPool,
+) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar!(
+        r#"
+        select
+            distinct e.email_address
+        from
+            email e
+            join founder f on f.id = e.founder_id
+            join domain d on d.domain = f.domain
+            join product p on p.id = d.product_id
+        where
+            p.niche = $1 and
+            e.verified_status = 'VERIFIED'
+        "#,
+        niche
+    )
+    .fetch_all(pool)
+    .await
+}
