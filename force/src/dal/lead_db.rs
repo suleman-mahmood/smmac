@@ -56,7 +56,28 @@ pub async fn insert_niche_products(
     }
 }
 
-pub async fn get_domains(
+pub async fn get_domains_for_niche(niche: &str, pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
+    let domains = sqlx::query_scalar!(
+        r#"
+        select
+            distinct d.domain
+        from
+            domain d
+            join product p on p.id = d.product_id
+        where
+            p.niche = $1 and
+            d.domain is not null
+        "#,
+        niche,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let domains: Vec<String> = domains.into_iter().flatten().collect();
+    Ok(domains)
+}
+
+pub async fn get_domains_for_product(
     product_url: &str,
     pool: &PgPool,
 ) -> Result<Option<Vec<String>>, sqlx::Error> {

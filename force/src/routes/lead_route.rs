@@ -44,14 +44,12 @@ async fn get_leads_from_niche(
     let domain_search_queries =
         get_product_search_queries(&pool, &openai_client, &body.niche).await;
 
-    let domains_result = get_urls_from_google_searches(&pool, domain_search_queries).await;
+    _ = get_urls_from_google_searches(&pool, domain_search_queries).await;
+
+    let domains_result = lead_db::get_domains_for_niche(&body.niche, &pool).await;
     if let Err(error) = domains_result {
-        return HttpResponse::Ok().body(format!(
-            "Got webdriver error from domain google searches: {:?}",
-            error
-        ));
+        return HttpResponse::Ok().body(format!("Got error while fetching domains: {:?}", error));
     }
-    // These domains are unique
     let domains = domains_result.unwrap();
 
     log::info!(
@@ -106,7 +104,7 @@ async fn get_urls_from_google_searches(
 
     for query in search_queries.into_iter() {
         // Fetch domain urls for url, if exist don't search
-        if let Ok(Some(domains)) = lead_db::get_domains(&query, pool).await {
+        if let Ok(Some(domains)) = lead_db::get_domains_for_product(&query, pool).await {
             all_domains.extend(domains);
             continue;
         };
