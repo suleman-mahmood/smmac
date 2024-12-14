@@ -1,5 +1,6 @@
 use std::net::TcpListener;
 
+use actix_files::Files;
 use actix_web::{
     dev::Server,
     middleware::Logger,
@@ -26,6 +27,7 @@ pub fn run(
     let server = HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
+            .service(Files::new("/static", "./templates/static").prefer_utf8(true))
             .service(default_route::default)
             .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
             .service(
