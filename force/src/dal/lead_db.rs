@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use check_if_email_exists::Reachable;
 use serde::Deserialize;
 use sqlx::{postgres::PgQueryResult, PgPool};
@@ -364,6 +366,16 @@ pub enum EmailVerifiedStatus {
     Invalid,
 }
 
+impl Display for EmailVerifiedStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EmailVerifiedStatus::Pending => write!(f, "Pending"),
+            EmailVerifiedStatus::Verified => write!(f, "Verified"),
+            EmailVerifiedStatus::Invalid => write!(f, "Invalid"),
+        }
+    }
+}
+
 pub async fn insert_emails(founder_domain_emails: Vec<FounderDomainEmail>, pool: &PgPool) {
     for fde in founder_domain_emails {
         let founder_id = sqlx::query_scalar!(
@@ -403,6 +415,17 @@ pub enum EmailReachability {
     Unknown,
     Risky,
     Invalid,
+}
+
+impl Display for EmailReachability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EmailReachability::Safe => write!(f, "Safe"),
+            EmailReachability::Unknown => write!(f, "Unknown"),
+            EmailReachability::Risky => write!(f, "Risky"),
+            EmailReachability::Invalid => write!(f, "Invalid"),
+        }
+    }
 }
 
 impl From<Reachable> for EmailReachability {

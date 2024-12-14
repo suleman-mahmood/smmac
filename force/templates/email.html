@@ -7,7 +7,6 @@
 
 <div class="hero bg-base-200">
   <div class="hero-content">
-    <!-- All niches -->
     <div class="overflow-x-auto">
       <table class="table table-xs table-pin-rows table-pin-cols">
         <thead>
@@ -15,20 +14,26 @@
             <th>Niche</th>
             <th>Product</th>
             <th>Domain</th>
-            <th>Candidate url</th>
+            <th>Founder name</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Reachability</th>
           </tr>
         </thead>
         <tbody>
-          {% for d in domains %}
+          {% for e in emails %}
           <tr>
-            <td>{{ d.niche }}</td>
-            <td>{{ d.product }}</td>
+            <td>{{ e.niche }}</td>
+            <td>{{ e.product }}</td>
+            <td>{{ e.domain }}</td>
             <td>
-              {% if let Some(dom) = d.domain %}
-                {{ dom }}
+              {% if let Some(fn) = e.founder_name %}
+                {{ fn }}
               {% endif %}
             </td>
-            <td>{{ d.domain_candidate_url }}</td>
+            <td>{{ e.email_address }}</td>
+            <td>{{ e.verified_status }}</td>
+            <td>{{ e.reachability }}</td>
           </tr>
           {% endfor %}
         </tbody>
