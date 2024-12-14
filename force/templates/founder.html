@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block content %} 
+
+{% include "navbar.html" %} 
+
+
+<div class="hero bg-base-200">
+  <div class="hero-content">
+    <!-- All niches -->
+    <div class="overflow-x-auto">
+      <table class="table table-xs table-pin-rows table-pin-cols">
+        <thead>
+          <tr>
+            <th>Niche</th>
+            <th>Product</th>
+            <th>Domain</th>
+            <th>Element content</th>
+            <th>Founder name</th>
+            <th>No results</th>
+            <th></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in founders %}
+          <tr>
+            <td>{{ f.niche }}</td>
+            <td>{{ f.product }}</td>
+            <td>{{ f.domain }}</td>
+            <td>{{ f.element_content }}</td>
+            <td>
+              {% if let Some(fn) = f.founder_name %}
+                {{ fn }}
+              {% endif %}
+            </td>
+            <td>{{ f.no_results }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

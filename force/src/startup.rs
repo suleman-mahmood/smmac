@@ -11,7 +11,8 @@ use sqlx::PgPool;
 
 use crate::{
     routes::{
-        dashboard_route, default_route, domain_route, experiment_route, lead_route, login_route,
+        dashboard_route, default_route, domain_route, experiment_route, founder_route, lead_route,
+        login_route,
     },
     services::{OpenaiClient, Sentinel},
 };
@@ -53,6 +54,7 @@ pub fn run(
                 web::scope("/app")
                     .service(login_route::login)
                     .service(domain_route::domain)
+                    .service(founder_route::founder)
                     .service(dashboard_route::dashboard),
             )
             .app_data(db_pool.clone())

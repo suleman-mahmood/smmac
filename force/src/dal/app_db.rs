@@ -48,3 +48,34 @@ pub async fn get_domain_table(pool: &PgPool) -> Result<Vec<DomainRow>, sqlx::Err
     .fetch_all(pool)
     .await
 }
+
+pub struct FounderRow {
+    pub niche: String,
+    pub product: String,
+    pub domain: String,
+    pub element_content: String,
+    pub founder_name: Option<String>,
+    pub no_results: bool,
+}
+
+pub async fn get_founder_table(pool: &PgPool) -> Result<Vec<FounderRow>, sqlx::Error> {
+    sqlx::query_as!(
+        FounderRow,
+        r#"
+        select
+            p.niche,
+            p.product,
+            f.domain,
+            f.element_content,
+            f.founder_name,
+            f.no_results
+        from
+            founder f
+            join domain d on d.domain = f.domain
+            join product p on p.id = d.product_id
+        order by f.created_at desc
+        "#,
+    )
+    .fetch_all(pool)
+    .await
+}
