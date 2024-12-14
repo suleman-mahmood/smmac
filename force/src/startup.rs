@@ -10,7 +10,7 @@ use actix_web::{
 use sqlx::PgPool;
 
 use crate::{
-    routes::{default_route, experiment_route, lead_route},
+    routes::{default_route, experiment_route, lead_route, login_route},
     services::{OpenaiClient, Sentinel},
 };
 
@@ -47,6 +47,7 @@ pub fn run(
                     .service(experiment_route::no_driver_scrape)
                     .service(experiment_route::check_ip_address_request),
             )
+            .service(web::scope("/app").service(login_route::login))
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())
             .app_data(sentinel.clone())
