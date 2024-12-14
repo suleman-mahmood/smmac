@@ -62,10 +62,17 @@ async fn get_leads_from_niche(
 
     save_founders_from_google_searches_batch(&pool, domains.clone()).await;
 
-    let raw_emails = construct_emails(&pool, domains).await;
+    construct_emails(&pool, domains).await;
+
+    let raw_emails_result = lead_db::get_raw_pending_emails_for_niche(&body.niche, &pool).await;
+    if let Err(error) = raw_emails_result {
+        return HttpResponse::Ok()
+            .body(format!("Got error while fetching raw emails: {:?}", error));
+    }
+    let raw_emails = raw_emails_result.unwrap();
 
     log::info!(">>> >>> >>>");
-    log::info!("Constructed emails: {}", raw_emails.len());
+    log::info!("Emails to verify: {}", raw_emails.len());
     log::info!(">>> >>> >>>");
 
     verify_emails(&pool, sentinel, raw_emails).await;

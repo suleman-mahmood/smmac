@@ -460,3 +460,26 @@ pub async fn get_verified_emails_for_niche(
     .fetch_all(pool)
     .await
 }
+
+pub async fn get_raw_pending_emails_for_niche(
+    niche: &str,
+    pool: &PgPool,
+) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar!(
+        r#"
+        select
+            e.email_address
+        from
+            email e
+            join founder f on f.id = e.founder_id
+            join domain d on d.domain = f.domain
+            join product p on p.id = d.product_id
+        where
+            p.niche = $1 and
+            e.verified_status = 'PENDING'
+        "#,
+        niche,
+    )
+    .fetch_all(pool)
+    .await
+}
