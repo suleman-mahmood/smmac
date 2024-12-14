@@ -7,29 +7,6 @@ use crate::routes::lead_route::{
     FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate,
 };
 
-pub struct ProductRow {
-    pub niche: String,
-    pub product: String,
-    pub no_results: bool,
-}
-
-pub async fn get_product_table(pool: &PgPool) -> Result<Vec<ProductRow>, sqlx::Error> {
-    sqlx::query_as!(
-        ProductRow,
-        r#"
-        select
-            niche,
-            product,
-            no_results
-        from
-            product
-        order by created_at desc
-        "#,
-    )
-    .fetch_all(pool)
-    .await
-}
-
 pub async fn get_product_search_queries(
     niche: &str,
     pool: &PgPool,
