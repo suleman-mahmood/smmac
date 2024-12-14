@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            niche,\n            product,\n            no_results\n        from\n            product\n        order by created_at desc\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "niche",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "product",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "no_results",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5524f205804b21f9f834888035a6f9c82103e490ed5629045552875ab44999a8"
+}
