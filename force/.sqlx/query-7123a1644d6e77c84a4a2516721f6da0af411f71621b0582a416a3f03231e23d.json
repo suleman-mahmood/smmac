@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            p.niche,\n            p.product,\n            f.domain,\n            f.element_content,\n            f.founder_name,\n            f.no_results\n        from\n            founder f\n            join domain d on d.domain = f.domain\n            join product p on p.id = d.product_id\n        order by f.created_at desc\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "niche",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "product",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "element_content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "founder_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "no_results",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "7123a1644d6e77c84a4a2516721f6da0af411f71621b0582a416a3f03231e23d"
+}

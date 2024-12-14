@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            p.niche,\n            p.product,\n            d.domain_candidate_url,\n            d.domain\n        from\n            domain d\n            join product p on p.id = d.product_id\n        order by d.created_at desc\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "niche",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "product",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain_candidate_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "domain",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "12436897da4f6d35957853a01a0b29e6e19fe27b57d1f56c8b732811e6cbaf1e"
+}
