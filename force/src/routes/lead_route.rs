@@ -348,7 +348,7 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
             let domain = domain.clone();
 
             handles.push(tokio::spawn(async move {
-                if let Ok(Some(_)) = lead_db::get_founder_tags(&domain, &pool).await {
+                if let Ok(true) = lead_db::founders_already_scraped(&domain, &pool).await {
                 } else {
                     // TODO: Fetch query / url from db instead
                     let query = build_founder_seach_query(domain.clone());

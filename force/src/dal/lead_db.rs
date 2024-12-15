@@ -192,11 +192,8 @@ pub enum ElementType {
     Span,
     HThree,
 }
-pub async fn get_founder_tags(
-    domain: &str,
-    pool: &PgPool,
-) -> Result<Option<Vec<FounderElement>>, sqlx::Error> {
-    let rows = sqlx::query!(
+pub async fn founders_already_scraped(domain: &str, pool: &PgPool) -> Result<bool, sqlx::Error> {
+    let row = sqlx::query!(
         r#"
         select
             element_content,
@@ -204,41 +201,17 @@ pub async fn get_founder_tags(
         from
             founder
         where
-            domain = $1 and
-            no_results = false
+            domain = $1
         "#,
         domain,
     )
-    .fetch_all(pool)
+    .fetch_optional(pool)
     .await?;
 
-    if rows.is_empty() {
-        let no_results =
-            sqlx::query_scalar!("select no_results from founder where domain = $1", domain)
-                .fetch_optional(pool)
-                .await?;
-
-        return match no_results {
-            Some(nr) => {
-                if nr {
-                    Ok(Some(vec![]))
-                } else {
-                    Ok(None)
-                }
-            }
-            None => Ok(None),
-        };
+    match row {
+        Some(_) => Ok(true),
+        None => Ok(false),
     }
-
-    let elements = rows
-        .into_iter()
-        .map(|r| match r.element_type {
-            ElementType::Span => FounderElement::Span(r.element_content),
-            ElementType::HThree => FounderElement::H3(r.element_content),
-        })
-        .collect();
-
-    Ok(Some(elements))
 }
 
 pub async fn insert_domain_no_results(
