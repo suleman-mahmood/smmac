@@ -121,7 +121,7 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
 
             handles.push(tokio::spawn(async move {
                 // Fetch domain urls for url, if exist don't search
-                if let Ok(Some(_)) = lead_db::get_domains_for_product(&query, &pool).await {
+                if let Ok(true) = lead_db::product_already_scraped(&query, &pool).await {
                 } else {
                     let mut current_url = None;
                     let mut domain_urls_list: Vec<String> = vec![];
@@ -182,10 +182,10 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
                     .await
                     {
                         log::error!(
-                        "Error inserting domain candidate urls in db for url: {} and error: {:?}",
-                        query,
-                        e
-                    )
+                            "Error inserting domain candidate urls in db for url: {} and error: {:?}",
+                            query,
+                            e,
+                        )
                     }
                 }
             }));

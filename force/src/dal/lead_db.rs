@@ -85,27 +85,27 @@ pub async fn get_domains_for_niche(niche: &str, pool: &PgPool) -> Result<Vec<Str
     Ok(domains)
 }
 
-pub async fn get_domains_for_product(
+pub async fn product_already_scraped(
     product_url: &str,
     pool: &PgPool,
-) -> Result<Option<Vec<String>>, sqlx::Error> {
-    let domains = sqlx::query_scalar!(
+) -> Result<bool, sqlx::Error> {
+    let domain = sqlx::query_scalar!(
         r#"
         select
-            distinct d.domain
+            d.domain
         from
             domain d
             join product p on p.id = d.product_id
         where
-            p.domain_search_url = $1
+            p.domain_search_url = $1 and
+            d.domain is not null
         "#,
         product_url,
     )
-    .fetch_all(pool)
+    .fetch_optional(pool)
     .await?;
-    let domains: Vec<String> = domains.into_iter().flatten().collect();
 
-    match domains.is_empty() {
+    match domain.is_none() {
         true => {
             let no_results = sqlx::query_scalar!(
                 "select no_results from product where domain_search_url = $1",
@@ -117,15 +117,15 @@ pub async fn get_domains_for_product(
             match no_results {
                 Some(nr) => {
                     if nr {
-                        Ok(Some(vec![]))
+                        Ok(true)
                     } else {
-                        Ok(None)
+                        Ok(false)
                     }
                 }
-                None => Ok(None),
+                None => Ok(false),
             }
         }
-        false => Ok(Some(domains)),
+        false => Ok(true),
     }
 }
 
