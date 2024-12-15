@@ -11,7 +11,7 @@ use crate::{
     services::{get_random_proxy, OpenaiClient, Sentinel},
 };
 
-const DEPTH_GOOGLE_SEACH_PAGES: u8 = 5; // Should be > 0
+const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
 const NUM_CAPTCHA_RETRIES: u8 = 100; // Should be > 0
 
 #[derive(Deserialize)]
@@ -587,7 +587,7 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
 }
 
 async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec<String>) {
-    const BATCH_SIZE: usize = 1000;
+    const BATCH_SIZE: usize = 100;
 
     for batch in emails.chunks(BATCH_SIZE) {
         let mut handles = Vec::new();
