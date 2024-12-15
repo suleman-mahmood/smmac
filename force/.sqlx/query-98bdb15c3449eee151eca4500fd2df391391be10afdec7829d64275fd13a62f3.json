@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into product\n            (id, niche, product, domain_search_url)\n        select * from unnest (\n            $1::uuid[],\n            $2::text[],\n            $3::text[],\n            $4::text[]\n        )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "98bdb15c3449eee151eca4500fd2df391391be10afdec7829d64275fd13a62f3"
+}
