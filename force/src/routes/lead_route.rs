@@ -1,18 +1,14 @@
-use std::time::Duration;
-
 use actix_web::{get, web, HttpResponse};
 use check_if_email_exists::Reachable;
-use itertools::Itertools;
-use rand::Rng;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use thirtyfour::{error::WebDriverError, prelude::ElementQueryable, By};
+use thirtyfour::error::WebDriverError;
 use url::Url;
 
 use crate::{
     dal::lead_db::{self, EmailReachability, EmailVerifiedStatus},
-    services::{get_random_proxy, make_new_driver, Droid, OpenaiClient, Sentinel},
+    services::{get_random_proxy, OpenaiClient, Sentinel},
 };
 
 const DEPTH_GOOGLE_SEACH_PAGES: u8 = 5; // Should be > 0
@@ -201,92 +197,6 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
     }
 }
 
-async fn get_urls_from_google_searches(
-    pool: &PgPool,
-    search_queries: Vec<String>,
-) -> Result<Vec<String>, WebDriverError> {
-    // TODO: Dont' return domains, just save them to db
-    let mut all_domains: Vec<String> = vec![];
-
-    for query in search_queries.into_iter() {
-        // Fetch domain urls for url, if exist don't search
-        if let Ok(Some(domains)) = lead_db::get_domains_for_product(&query, pool).await {
-            all_domains.extend(domains);
-            continue;
-        };
-
-        let mut current_url = None;
-        let mut domain_urls_list: Vec<String> = vec![];
-        let mut not_found = false;
-
-        for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
-            match extract_data_from_google_search_with_reqwest(
-                query.clone(),
-                GoogleSearchType::Domain(current_url.clone()),
-            )
-            .await?
-            {
-                GoogleSearchResult::NotFound => {
-                    not_found = true;
-                    break;
-                }
-                GoogleSearchResult::Founders(_) => {
-                    log::error!("Returning founders from domain google search");
-                    break;
-                }
-                GoogleSearchResult::Domains {
-                    domain_urls,
-                    next_page_url,
-                } => {
-                    domain_urls_list.extend(domain_urls);
-                    match next_page_url {
-                        Some(url) => current_url = Some(url),
-                        None => break,
-                    }
-                }
-            }
-        }
-
-        not_found = domain_urls_list.is_empty() && not_found;
-
-        let domains: Vec<Option<String>> = domain_urls_list
-            .iter()
-            .map(|url| get_domain_from_url(url))
-            .collect();
-        let founder_search_queries: Vec<Option<String>> = domains
-            .clone()
-            .into_iter()
-            .map(|dom| dom.map(build_founder_seach_query))
-            .collect();
-
-        // Remove None domains
-        let valid_domains: Vec<String> = domains.clone().into_iter().flatten().collect();
-        all_domains.extend(valid_domains);
-
-        // Save domain entries
-        if let Err(e) = lead_db::insert_domain_candidate_urls(
-            domain_urls_list,
-            domains,
-            founder_search_queries,
-            &query,
-            not_found,
-            pool,
-        )
-        .await
-        {
-            log::error!(
-                "Error inserting domain candidate urls in db for url: {} and error: {:?}",
-                query,
-                e
-            )
-        }
-    }
-
-    // Remove duplicate domains
-    let all_domains = all_domains.into_iter().unique().collect();
-    Ok(all_domains)
-}
-
 enum GoogleSearchType {
     Domain(Option<String>),
     Founder(String),
@@ -415,146 +325,6 @@ async fn extract_data_from_google_search_with_reqwest(
     )))
 }
 
-async fn extract_data_from_google_search(
-    droid: &web::Data<Droid>,
-    url: String,
-    search_type: GoogleSearchType,
-) -> Result<GoogleSearchResult, WebDriverError> {
-    let mut drivers = droid.drivers.lock().await;
-    let mut rand = rand::thread_rng();
-    let mut retry_count = 0;
-    let mut captcha_blocked = false;
-
-    let mut driver_index = rand.gen_range(0..drivers.len());
-    let mut driver = drivers.get(driver_index).unwrap();
-
-    while retry_count < NUM_CAPTCHA_RETRIES {
-        if captcha_blocked {
-            log::error!("Blocked by captcha on url: {}", url);
-
-            driver.clone().quit().await.unwrap();
-            drivers.remove(driver_index);
-
-            let new_driver = make_new_driver().await;
-            drivers.push(new_driver);
-
-            retry_count += 1;
-        }
-
-        driver_index = rand.gen_range(0..drivers.len());
-        driver = drivers.get(driver_index).unwrap();
-        driver.goto(url.clone()).await?;
-
-        match driver
-            .query(By::XPath("//h3"))
-            .wait(Duration::from_secs(11), Duration::from_secs(2))
-            .exists()
-            .await
-        {
-            // No h3 tag found
-            Err(_) => match driver.source().await {
-                Ok(source) => {
-                    if source.contains("did not match any documents") {
-                        log::error!("Found no results on url: {}", url);
-                        return Ok(GoogleSearchResult::NotFound);
-                    } else {
-                        captcha_blocked = true
-                    }
-                }
-                Err(_) => captcha_blocked = true,
-            },
-            Ok(exists) => {
-                if exists {
-                    match search_type {
-                        GoogleSearchType::Domain(_) => {
-                            let mut domain_urls: Vec<String> = vec![];
-                            let mut next_page_url = None;
-
-                            for a_tag in driver.find_all(By::XPath("//a")).await? {
-                                let href_attribute = a_tag.attr("href").await?;
-                                if let Some(href) = href_attribute {
-                                    domain_urls.push(href);
-                                }
-                            }
-
-                            log::info!("Found {} urls | Potential domains", domain_urls.len(),);
-
-                            if let Ok(next_page_element) =
-                                driver.find(By::XPath(r#"//a[@id="pnnext"]"#)).await
-                            {
-                                if let Some(href_attribute) = next_page_element.attr("href").await?
-                                {
-                                    let next_url =
-                                        format!("https://www.google.com{}", href_attribute);
-                                    next_page_url = Some(next_url);
-                                }
-                            }
-
-                            return Ok(GoogleSearchResult::Domains {
-                                domain_urls,
-                                next_page_url,
-                            });
-                        }
-                        GoogleSearchType::Founder(ref domain) => {
-                            let mut h3_tags = vec![];
-                            let mut span_tags = vec![];
-
-                            for h3_tag in driver.find_all(By::XPath("//h3")).await? {
-                                let text = h3_tag.text().await?;
-                                h3_tags.push(text);
-                            }
-
-                            // TODO: Update this query, returns no result
-                            for span_tag in driver
-                                .find_all(By::XPath(
-                                    "//h3/following-sibling::div/div/div/div[1]/span",
-                                ))
-                                .await?
-                            {
-                                let text = span_tag.text().await?;
-                                span_tags.push(text);
-                            }
-
-                            log::info!(
-                                "Found {} h3_tags, {} span_tags | Potential founder names",
-                                h3_tags.len(),
-                                span_tags.len()
-                            );
-
-                            let elements = h3_tags
-                                .into_iter()
-                                .map(FounderElement::H3)
-                                .chain(span_tags.into_iter().map(FounderElement::Span))
-                                .collect();
-                            return Ok(GoogleSearchResult::Founders(FounderTagCandidate {
-                                elements,
-                                domain: domain.to_string(),
-                            }));
-                        }
-                    }
-                } else {
-                    match driver.source().await {
-                        Ok(source) => {
-                            if source.contains("did not match any documents") {
-                                log::error!("Found no results on url: {}", url);
-                                return Ok(GoogleSearchResult::NotFound);
-                            } else {
-                                captcha_blocked = true
-                            }
-                        }
-                        Err(_) => captcha_blocked = true,
-                    }
-                }
-            }
-        }
-    }
-
-    Err(WebDriverError::RequestFailed(format!(
-        "{} retries exceeded",
-        NUM_CAPTCHA_RETRIES
-    )))
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum FounderElement {
     Span(String),
@@ -617,51 +387,6 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
             _ = handle.await;
         }
     }
-}
-
-async fn get_founders_from_google_searches(
-    pool: &PgPool,
-    domains: Vec<String>,
-) -> Result<Vec<FounderTagCandidate>, WebDriverError> {
-    let mut founder_candidate: Vec<FounderTagCandidate> = vec![];
-
-    for domain in domains {
-        if let Ok(Some(founder_tags)) = lead_db::get_founder_tags(&domain, pool).await {
-            founder_candidate.push(FounderTagCandidate {
-                elements: founder_tags,
-                domain,
-            });
-            continue;
-        }
-
-        // TODO: Fetch query / url from db instead
-        let query = build_founder_seach_query(domain.clone());
-
-        match extract_data_from_google_search_with_reqwest(
-            query.to_string(),
-            GoogleSearchType::Founder(domain.to_string()),
-        )
-        .await?
-        {
-            GoogleSearchResult::NotFound => {
-                let _ = lead_db::insert_domain_no_results(&domain, pool).await;
-                continue;
-            }
-            GoogleSearchResult::Domains { .. } => {
-                log::error!("Returning domains from founder google search");
-                continue;
-            }
-            GoogleSearchResult::Founders(tag_candidate) => {
-                founder_candidate.push(tag_candidate.clone());
-
-                // Save results to db
-                let founder_names = extract_founder_names(tag_candidate.clone());
-                lead_db::insert_founders(tag_candidate.clone(), founder_names, &domain, pool).await;
-            }
-        }
-    }
-
-    Ok(founder_candidate)
 }
 
 pub fn build_seach_query(product: String) -> String {
