@@ -39,23 +39,29 @@ pub async fn insert_niche_products(
     search_queries: Vec<String>,
     niche: &str,
     pool: &PgPool,
-) {
-    for (pro, search_query) in products.iter().zip(search_queries.iter()) {
-        _ = sqlx::query!(
-            r#"
-            insert into product
-                (id, niche, product, domain_search_url)
-            values
-                ($1, $2, $3, $4)
-            "#,
-            Uuid::new_v4(),
-            niche,
-            pro,
-            search_query,
+) -> Result<PgQueryResult, sqlx::Error> {
+    let total_rows = products.len();
+    let ids: Vec<Uuid> = (0..total_rows).map(|_| Uuid::new_v4()).collect();
+    let niche: Vec<String> = (0..total_rows).map(|_| niche.to_string()).collect();
+
+    sqlx::query!(
+        r#"
+        insert into product
+            (id, niche, product, domain_search_url)
+        select * from unnest (
+            $1::uuid[],
+            $2::text[],
+            $3::text[],
+            $4::text[]
         )
-        .execute(pool)
-        .await;
-    }
+        "#,
+        &ids,
+        &niche,
+        &products,
+        &search_queries
+    )
+    .execute(pool)
+    .await
 }
 
 pub async fn get_domains_for_niche(niche: &str, pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {

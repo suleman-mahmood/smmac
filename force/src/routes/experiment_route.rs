@@ -8,7 +8,7 @@ use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 use uuid::Uuid;
 
 use crate::{
-    dal::lead_db::ElementType,
+    dal::lead_db::{self, ElementType},
     services::{get_random_proxy, Droid, OpenaiClient, Sentinel},
 };
 
@@ -403,4 +403,27 @@ async fn no_driver_scrape() -> HttpResponse {
         }
         Err(e) => HttpResponse::Ok().body(format!("Got error: {:?}", e)),
     }
+}
+
+#[get("/bulk-products")]
+async fn insert_bulk_products(
+    pool: web::Data<PgPool>,
+    openai_client: web::Data<OpenaiClient>,
+) -> HttpResponse {
+    let niche = "database";
+
+    let products = openai_client
+        .get_boolean_searches_from_niche(niche)
+        .await
+        .unwrap();
+
+    let search_queries: Vec<String> = products
+        .iter()
+        .map(|p| lead_route::build_seach_query(p.to_string()))
+        .collect();
+
+    _ = lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, &pool)
+        .await;
+
+    HttpResponse::Ok().body("Done!")
 }

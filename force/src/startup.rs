@@ -48,6 +48,7 @@ pub fn run(
                     .service(experiment_route::verify_email)
                     .service(experiment_route::emails_step)
                     .service(experiment_route::no_driver_scrape)
+                    .service(experiment_route::insert_bulk_products)
                     .service(experiment_route::check_ip_address_request),
             )
             .service(

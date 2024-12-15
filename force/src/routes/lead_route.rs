@@ -108,7 +108,7 @@ async fn get_product_search_queries(
         .map(|p| build_seach_query(p.to_string()))
         .collect();
 
-    lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool).await;
+    _ = lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool).await;
 
     search_queries
 }
@@ -664,7 +664,7 @@ async fn get_founders_from_google_searches(
     Ok(founder_candidate)
 }
 
-fn build_seach_query(product: String) -> String {
+pub fn build_seach_query(product: String) -> String {
     format!(r#""{}" AND "buy now""#, product)
 }
 
