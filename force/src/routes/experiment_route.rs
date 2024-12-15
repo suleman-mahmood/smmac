@@ -132,9 +132,6 @@ async fn check_ip_address(droid: web::Data<Droid>) -> HttpResponse {
 
 #[get("/check-ip-address-reqwest")]
 async fn check_ip_address_request() -> HttpResponse {
-    // let http_proxy = reqwest::Proxy::http("http://p.webshare.io:9999/").unwrap();
-    // let https_proxy = reqwest::Proxy::http("https://p.webshare.io:9999/").unwrap();
-
     let proxy = get_random_proxy();
     let http_proxy = reqwest::Proxy::http(proxy.clone()).unwrap();
     let https_proxy = reqwest::Proxy::https(proxy.clone()).unwrap();

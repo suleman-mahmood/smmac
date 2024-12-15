@@ -1,6 +1,6 @@
 use fake_user_agent::get_rua;
 use rand::seq::SliceRandom;
-use serde_json::json;
+use serde_json::{json, to_string};
 use thirtyfour::{
     CapabilitiesHelper, ChromiumLikeCapabilities, DesiredCapabilities, Proxy, WebDriver,
 };
@@ -129,7 +129,8 @@ impl Droid {
 }
 
 pub fn get_random_proxy() -> String {
-    PROXIES.choose(&mut rand::thread_rng()).unwrap().to_string()
+    // PROXIES.choose(&mut rand::thread_rng()).unwrap().to_string()
+    "http://p.webshare.io:9999/".to_string()
 }
 
 pub async fn make_new_driver() -> WebDriver {
