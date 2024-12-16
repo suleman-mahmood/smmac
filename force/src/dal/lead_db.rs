@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use check_if_email_exists::Reachable;
 use serde::Deserialize;
-use sqlx::{postgres::PgQueryResult, PgPool};
+use sqlx::{postgres::PgQueryResult, PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::routes::lead_route::{
@@ -420,9 +420,9 @@ impl From<Reachable> for EmailReachability {
 
 pub async fn set_email_verification_reachability(
     email: &str,
-    reachability: EmailReachability,
     status: EmailVerifiedStatus,
-    pool: &PgPool,
+    reachability: EmailReachability,
+    con: &mut PgConnection,
 ) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!(
         r#"
@@ -436,7 +436,7 @@ pub async fn set_email_verification_reachability(
         reachability as EmailReachability,
         status as EmailVerifiedStatus,
     )
-    .execute(pool)
+    .execute(con)
     .await
 }
 

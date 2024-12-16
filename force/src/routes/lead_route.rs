@@ -2,7 +2,7 @@ use actix_web::{get, web, HttpResponse};
 use check_if_email_exists::Reachable;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{Acquire, PgPool};
 use thirtyfour::error::WebDriverError;
 use url::Url;
 
@@ -587,13 +587,12 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
 }
 
 async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec<String>) {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
 
     for batch in emails.chunks(BATCH_SIZE) {
         let mut handles = Vec::new();
 
         for em in batch {
-            let pool = pool.clone();
             let sentinel = sentinel.clone();
             let em = em.clone();
 
@@ -604,13 +603,26 @@ async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec
                     _ => EmailVerifiedStatus::Invalid,
                 };
                 let reachable: EmailReachability = reachable.into();
-                _ = lead_db::set_email_verification_reachability(&em, reachable, status, &pool)
-                    .await;
+
+                (em, status, reachable)
             }));
         }
 
+        let mut handler_results = vec![];
+
         for handle in handles {
-            _ = handle.await;
+            let res = handle.await;
+            if let Ok(r) = res {
+                handler_results.push(r);
+            }
+        }
+
+        // update in lead db
+        let mut pool_con = pool.acquire().await.unwrap();
+        let con = pool_con.acquire().await.unwrap();
+        for params in handler_results {
+            _ = lead_db::set_email_verification_reachability(&params.0, params.1, params.2, con)
+                .await;
         }
     }
 }
