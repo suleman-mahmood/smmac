@@ -40,7 +40,10 @@ async fn get_leads_from_niche(
     let domain_search_queries =
         get_product_search_queries(&pool, &openai_client, &body.niche).await;
 
-    // TODO: Get unscraped search queries only and pass it below
+    let domain_search_queries =
+        lead_db::get_unscraped_products(domain_search_queries, &body.niche, &pool)
+            .await
+            .unwrap();
 
     save_urls_from_google_searche_batch(&pool, domain_search_queries).await;
 
@@ -118,85 +121,91 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
         let mut handles = Vec::new();
 
         for query in batch {
-            let pool = pool.clone();
             let query = query.clone();
 
             handles.push(tokio::spawn(async move {
                 // Fetch domain urls for url, if exist don't search
-                // TODO: Remove this check
-                if let Ok(true) = lead_db::product_already_scraped(&query, &pool).await {
-                } else {
-                    let mut current_url = None;
-                    let mut domain_urls_list: Vec<String> = vec![];
-                    let mut not_found = false;
 
-                    for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
-                        if let Ok(google_search_result) =
-                            extract_data_from_google_search_with_reqwest(
-                                query.clone(),
-                                GoogleSearchType::Domain(current_url.clone()),
-                            )
-                            .await
-                        {
-                            match google_search_result {
-                                GoogleSearchResult::NotFound => {
-                                    not_found = true;
-                                    break;
-                                }
-                                GoogleSearchResult::Founders(_) => {
-                                    log::error!("Returning founders from domain google search");
-                                    break;
-                                }
-                                GoogleSearchResult::Domains {
-                                    domain_urls,
-                                    next_page_url,
-                                } => {
-                                    domain_urls_list.extend(domain_urls);
-                                    match next_page_url {
-                                        Some(url) => current_url = Some(url),
-                                        None => break,
-                                    }
+                let mut current_url = None;
+                let mut domain_urls_list: Vec<String> = vec![];
+                let mut not_found = false;
+
+                for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
+                    if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
+                        query.clone(),
+                        GoogleSearchType::Domain(current_url.clone()),
+                    )
+                    .await
+                    {
+                        match google_search_result {
+                            GoogleSearchResult::NotFound => {
+                                not_found = true;
+                                break;
+                            }
+                            GoogleSearchResult::Founders(_) => {
+                                log::error!("Returning founders from domain google search");
+                                break;
+                            }
+                            GoogleSearchResult::Domains {
+                                domain_urls,
+                                next_page_url,
+                            } => {
+                                domain_urls_list.extend(domain_urls);
+                                match next_page_url {
+                                    Some(url) => current_url = Some(url),
+                                    None => break,
                                 }
                             }
                         }
                     }
-
-                    not_found = domain_urls_list.is_empty() && not_found;
-
-                    let domains: Vec<Option<String>> = domain_urls_list
-                        .iter()
-                        .map(|url| get_domain_from_url(url))
-                        .collect();
-                    let founder_search_queries: Vec<Option<String>> = domains
-                        .clone()
-                        .into_iter()
-                        .map(|dom| dom.map(build_founder_seach_query))
-                        .collect();
-
-                    // Save domain entries
-                    // TODO: Batch it together in a single pool connection
-                    if let Err(e) = lead_db::insert_domain_candidate_urls(
-                        domain_urls_list,
-                        domains,
-                        founder_search_queries,
-                        &query,
-                        not_found,
-                        &pool,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "Error inserting domain candidate urls in db for url: {} and error: {:?}",
-                            query,
-                            e,
-                        )
-                    }
                 }
+
+                not_found = domain_urls_list.is_empty() && not_found;
+
+                let domains: Vec<Option<String>> = domain_urls_list
+                    .iter()
+                    .map(|url| get_domain_from_url(url))
+                    .collect();
+                let founder_search_queries: Vec<Option<String>> = domains
+                    .clone()
+                    .into_iter()
+                    .map(|dom| dom.map(build_founder_seach_query))
+                    .collect();
+
+                (
+                    domain_urls_list,
+                    domains,
+                    founder_search_queries,
+                    query,
+                    not_found,
+                )
             }));
         }
 
+        let mut handler_results = vec![];
+
         for handle in handles {
-            _ = handle.await;
+            let res = handle.await;
+            if let Ok(r) = res {
+                handler_results.push(r);
+            }
+        }
+
+        let mut pool_con = pool.acquire().await.unwrap();
+        let con = pool_con.acquire().await.unwrap();
+        for params in handler_results {
+            // Save domain entries
+            if let Err(e) = lead_db::insert_domain_candidate_urls(
+                params.0, params.1, params.2, &params.3, params.4, con,
+            )
+            .await
+            {
+                log::error!(
+                    "Error inserting domain candidate urls in db for url: {} and error: {:?}",
+                    params.3,
+                    e,
+                )
+            }
         }
     }
 }

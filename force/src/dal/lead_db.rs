@@ -85,6 +85,50 @@ pub async fn get_domains_for_niche(niche: &str, pool: &PgPool) -> Result<Vec<Str
     Ok(domains)
 }
 
+pub async fn get_unscraped_products(
+    products: Vec<String>,
+    niche: &str,
+    pool: &PgPool,
+) -> Result<Vec<String>, sqlx::Error> {
+    let products = sqlx::query_scalar!(
+        r#"
+        select
+            domain_search_url
+        from
+            product
+        where
+            domain_search_url = any($1) and
+            no_results = False
+        "#,
+        &products
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let scraped_products = sqlx::query_scalar!(
+        r#"
+        select
+            distinct p.domain_search_url
+        from
+            domain d
+            join product p on p.id = d.product_id
+        where
+            d.domain is not null and
+            p.niche = $1
+        "#,
+        niche
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let products = products
+        .into_iter()
+        .filter(|p| !scraped_products.contains(p))
+        .collect();
+
+    Ok(products)
+}
+
 pub async fn product_already_scraped(
     product_url: &str,
     pool: &PgPool,
@@ -135,7 +179,7 @@ pub async fn insert_domain_candidate_urls(
     founders: Vec<Option<String>>,
     search_url: &str,
     not_found: bool,
-    pool: &PgPool,
+    con: &mut PgConnection,
 ) -> Result<(), sqlx::Error> {
     let product_id = sqlx::query_scalar!(
         r#"
@@ -143,7 +187,7 @@ pub async fn insert_domain_candidate_urls(
         "#,
         search_url
     )
-    .fetch_optional(pool)
+    .fetch_optional(&mut *con)
     .await?;
 
     if product_id.is_none() {
@@ -157,7 +201,7 @@ pub async fn insert_domain_candidate_urls(
             "update product set no_results = true where domain_search_url = $1",
             search_url,
         )
-        .execute(pool)
+        .execute(con)
         .await?;
         return Ok(());
     }
@@ -180,7 +224,7 @@ pub async fn insert_domain_candidate_urls(
             dom.clone(),
             foun.clone()
         )
-        .execute(pool)
+        .execute(&mut *con)
         .await;
     }
     Ok(())
