@@ -40,6 +40,8 @@ async fn get_leads_from_niche(
     let domain_search_queries =
         get_product_search_queries(&pool, &openai_client, &body.niche).await;
 
+    // TODO: Get unscraped search queries only and pass it below
+
     save_urls_from_google_searche_batch(&pool, domain_search_queries).await;
 
     let domains_result = lead_db::get_domains_for_niche(&body.niche, &pool).await;
@@ -121,6 +123,7 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
 
             handles.push(tokio::spawn(async move {
                 // Fetch domain urls for url, if exist don't search
+                // TODO: Remove this check
                 if let Ok(true) = lead_db::product_already_scraped(&query, &pool).await {
                 } else {
                     let mut current_url = None;
@@ -171,6 +174,7 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
                         .collect();
 
                     // Save domain entries
+                    // TODO: Batch it together in a single pool connection
                     if let Err(e) = lead_db::insert_domain_candidate_urls(
                         domain_urls_list,
                         domains,
@@ -348,6 +352,7 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
             let domain = domain.clone();
 
             handles.push(tokio::spawn(async move {
+                // TODO: Remove this
                 if let Ok(true) = lead_db::founders_already_scraped(&domain, &pool).await {
                 } else {
                     // TODO: Fetch query / url from db instead
@@ -361,6 +366,7 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
                     {
                         match google_search_result {
                             GoogleSearchResult::NotFound => {
+                                // TODO: Move this into a batch on single connection
                                 let _ = lead_db::insert_domain_no_results(&domain, &pool).await;
                             }
                             GoogleSearchResult::Domains { .. } => {
@@ -368,6 +374,7 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
                             }
                             GoogleSearchResult::Founders(tag_candidate) => {
                                 // Save results to db
+                                // TODO: Move this into a batch on single connection
                                 let founder_names = extract_founder_names(tag_candidate.clone());
                                 lead_db::insert_founders(
                                     tag_candidate.clone(),
