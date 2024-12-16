@@ -230,6 +230,27 @@ pub async fn insert_domain_candidate_urls(
     Ok(())
 }
 
+pub async fn get_unscraped_domains(
+    domains: Vec<String>,
+    pool: &PgPool,
+) -> Result<Vec<String>, sqlx::Error> {
+    let scraped_domains = sqlx::query_scalar!(
+        r#"
+        select domain from founder where domain = any($1)
+        "#,
+        &domains
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let domains = domains
+        .into_iter()
+        .filter(|d| !scraped_domains.contains(d))
+        .collect();
+
+    Ok(domains)
+}
+
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "ElementType", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ElementType {
@@ -260,7 +281,7 @@ pub async fn founders_already_scraped(domain: &str, pool: &PgPool) -> Result<boo
 
 pub async fn insert_domain_no_results(
     domain: &str,
-    pool: &PgPool,
+    con: &mut PgConnection,
 ) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!(
         r#"
@@ -276,7 +297,7 @@ pub async fn insert_domain_no_results(
         "no-content",
         true,
     )
-    .execute(pool)
+    .execute(con)
     .await
 }
 
@@ -284,7 +305,7 @@ pub async fn insert_founders(
     founder: FounderTagCandidate,
     names: Vec<Option<String>>,
     domain: &str,
-    pool: &PgPool,
+    con: &mut PgConnection,
 ) {
     for (ele, name) in founder.elements.into_iter().zip(names.into_iter()) {
         let content;
@@ -312,7 +333,7 @@ pub async fn insert_founders(
             element_type as ElementType,
             name,
         )
-        .execute(pool)
+        .execute(&mut *con)
         .await;
     }
 }

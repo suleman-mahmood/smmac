@@ -61,6 +61,10 @@ async fn get_leads_from_niche(
     );
     log::info!(">>> >>> >>>");
 
+    let domains = lead_db::get_unscraped_domains(domains, &pool)
+        .await
+        .unwrap();
+
     save_founders_from_google_searches_batch(&pool, domains.clone()).await;
 
     construct_emails(&pool, domains).await;
@@ -350,6 +354,12 @@ pub struct FounderTagCandidate {
     pub domain: String,
 }
 
+enum FounderThreadResult {
+    Insert(FounderTagCandidate, Vec<Option<String>>, String),
+    NotFounder(String),
+    Ignore,
+}
+
 async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<String>) {
     const BATCH_SIZE: usize = 100;
 
@@ -361,46 +371,56 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
             let domain = domain.clone();
 
             handles.push(tokio::spawn(async move {
-                // TODO: Remove this
-                if let Ok(true) = lead_db::founders_already_scraped(&domain, &pool).await {
-                } else {
-                    // TODO: Fetch query / url from db instead
-                    let query = build_founder_seach_query(domain.clone());
+                // TODO: Fetch query / url from db instead
+                let query = build_founder_seach_query(domain.clone());
 
-                    if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
-                        query.to_string(),
-                        GoogleSearchType::Founder(domain.to_string()),
-                    )
-                    .await
-                    {
-                        match google_search_result {
-                            GoogleSearchResult::NotFound => {
-                                // TODO: Move this into a batch on single connection
-                                let _ = lead_db::insert_domain_no_results(&domain, &pool).await;
-                            }
-                            GoogleSearchResult::Domains { .. } => {
-                                log::error!("Returning domains from founder google search");
-                            }
-                            GoogleSearchResult::Founders(tag_candidate) => {
-                                // Save results to db
-                                // TODO: Move this into a batch on single connection
-                                let founder_names = extract_founder_names(tag_candidate.clone());
-                                lead_db::insert_founders(
-                                    tag_candidate.clone(),
-                                    founder_names,
-                                    &domain,
-                                    &pool,
-                                )
-                                .await;
-                            }
+                if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
+                    query.to_string(),
+                    GoogleSearchType::Founder(domain.to_string()),
+                )
+                .await
+                {
+                    match google_search_result {
+                        GoogleSearchResult::NotFound => FounderThreadResult::NotFounder(domain),
+                        GoogleSearchResult::Domains { .. } => {
+                            log::error!("Returning domains from founder google search");
+                            FounderThreadResult::Ignore
+                        }
+                        GoogleSearchResult::Founders(tag_candidate) => {
+                            let founder_names = extract_founder_names(tag_candidate.clone());
+
+                            FounderThreadResult::Insert(tag_candidate, founder_names, domain)
                         }
                     }
+                } else {
+                    FounderThreadResult::Ignore
                 }
             }));
         }
 
+        let mut handler_results = vec![];
+
         for handle in handles {
-            _ = handle.await;
+            let res = handle.await;
+            if let Ok(r) = res {
+                handler_results.push(r);
+            }
+        }
+
+        // Save results to db
+        let mut pool_con = pool.acquire().await.unwrap();
+        let con = pool_con.acquire().await.unwrap();
+
+        for params in handler_results {
+            match params {
+                FounderThreadResult::Insert(tag_candidate, founder_names, domain) => {
+                    _ = lead_db::insert_founders(tag_candidate, founder_names, &domain, con).await;
+                }
+                FounderThreadResult::NotFounder(domain) => {
+                    let _ = lead_db::insert_domain_no_results(&domain, con).await;
+                }
+                FounderThreadResult::Ignore => (),
+            }
         }
     }
 }
@@ -636,6 +656,7 @@ async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec
         // update in lead db
         let mut pool_con = pool.acquire().await.unwrap();
         let con = pool_con.acquire().await.unwrap();
+
         for params in handler_results {
             _ = lead_db::set_email_verification_reachability(&params.0, params.1, params.2, con)
                 .await;
