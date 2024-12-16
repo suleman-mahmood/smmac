@@ -367,7 +367,6 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
         let mut handles = Vec::new();
 
         for domain in batch {
-            let pool = pool.clone();
             let domain = domain.clone();
 
             handles.push(tokio::spawn(async move {

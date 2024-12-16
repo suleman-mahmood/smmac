@@ -129,50 +129,6 @@ pub async fn get_unscraped_products(
     Ok(products)
 }
 
-pub async fn product_already_scraped(
-    product_url: &str,
-    pool: &PgPool,
-) -> Result<bool, sqlx::Error> {
-    let domain = sqlx::query_scalar!(
-        r#"
-        select
-            d.domain
-        from
-            domain d
-            join product p on p.id = d.product_id
-        where
-            p.domain_search_url = $1 and
-            d.domain is not null
-        "#,
-        product_url,
-    )
-    .fetch_optional(pool)
-    .await?;
-
-    match domain.is_none() {
-        true => {
-            let no_results = sqlx::query_scalar!(
-                "select no_results from product where domain_search_url = $1",
-                product_url
-            )
-            .fetch_optional(pool)
-            .await?;
-
-            match no_results {
-                Some(nr) => {
-                    if nr {
-                        Ok(true)
-                    } else {
-                        Ok(false)
-                    }
-                }
-                None => Ok(false),
-            }
-        }
-        false => Ok(true),
-    }
-}
-
 pub async fn insert_domain_candidate_urls(
     domain_urls_list: Vec<String>,
     domains: Vec<Option<String>>,
@@ -256,27 +212,6 @@ pub async fn get_unscraped_domains(
 pub enum ElementType {
     Span,
     HThree,
-}
-pub async fn founders_already_scraped(domain: &str, pool: &PgPool) -> Result<bool, sqlx::Error> {
-    let row = sqlx::query!(
-        r#"
-        select
-            element_content,
-            element_type as "element_type: ElementType"
-        from
-            founder
-        where
-            domain = $1
-        "#,
-        domain,
-    )
-    .fetch_optional(pool)
-    .await?;
-
-    match row {
-        Some(_) => Ok(true),
-        None => Ok(false),
-    }
 }
 
 pub async fn insert_domain_no_results(
