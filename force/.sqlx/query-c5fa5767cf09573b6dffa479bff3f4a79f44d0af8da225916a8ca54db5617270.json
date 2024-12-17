@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            distinct p.domain_search_url\n        from\n            domain d\n            join product p on p.id = d.product_id\n        where\n            p.niche = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "domain_search_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c5fa5767cf09573b6dffa479bff3f4a79f44d0af8da225916a8ca54db5617270"
+}

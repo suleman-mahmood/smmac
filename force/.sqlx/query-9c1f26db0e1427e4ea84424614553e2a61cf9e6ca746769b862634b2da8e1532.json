@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            domain_search_url\n        from\n            product\n        where\n            niche = $1 and\n            no_results = False\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "domain_search_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9c1f26db0e1427e4ea84424614553e2a61cf9e6ca746769b862634b2da8e1532"
+}
