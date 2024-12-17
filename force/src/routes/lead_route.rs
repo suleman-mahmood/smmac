@@ -14,7 +14,7 @@ use crate::{
     services::{get_random_proxy, OpenaiClient, Sentinel},
 };
 
-const NUM_CAPTCHA_RETRIES: u8 = 100; // Should be > 0
+const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
 pub const FRESH_RESULTS: bool = true; // Default to false
 
 #[derive(Deserialize)]
@@ -156,31 +156,34 @@ async fn save_urls_from_google_searche_batch(
                 let mut not_found = false;
 
                 for _ in 0..page_depth {
-                    if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
+                    let google_search_result = extract_data_from_google_search_with_reqwest(
                         query.clone(),
                         GoogleSearchType::Domain(current_url.clone()),
                     )
-                    .await
-                    {
-                        match google_search_result {
-                            GoogleSearchResult::NotFound => {
-                                not_found = true;
-                                break;
+                    .await;
+
+                    match google_search_result {
+                        GoogleSearchResult::NotFound => {
+                            not_found = true;
+                            break;
+                        }
+                        GoogleSearchResult::Founders(_) => {
+                            log::error!("Returning founders from domain google search");
+                            break;
+                        }
+                        GoogleSearchResult::Domains {
+                            domain_urls,
+                            next_page_url,
+                        } => {
+                            domain_urls_list.extend(domain_urls);
+                            match next_page_url {
+                                Some(url) => current_url = Some(url),
+                                None => break,
                             }
-                            GoogleSearchResult::Founders(_) => {
-                                log::error!("Returning founders from domain google search");
-                                break;
-                            }
-                            GoogleSearchResult::Domains {
-                                domain_urls,
-                                next_page_url,
-                            } => {
-                                domain_urls_list.extend(domain_urls);
-                                match next_page_url {
-                                    Some(url) => current_url = Some(url),
-                                    None => break,
-                                }
-                            }
+                        }
+                        GoogleSearchResult::CaptchaBlocked => {
+                            log::error!("Returning from captcha blocked on url {}", query);
+                            break;
                         }
                     }
                 }
@@ -247,6 +250,7 @@ enum GoogleSearchResult {
         next_page_url: Option<String>,
     },
     Founders(FounderTagCandidate),
+    CaptchaBlocked,
 }
 
 #[derive(Serialize)]
@@ -257,7 +261,7 @@ struct GoogleQuery {
 async fn extract_data_from_google_search_with_reqwest(
     query: String,
     search_type: GoogleSearchType,
-) -> Result<GoogleSearchResult, WebDriverError> {
+) -> GoogleSearchResult {
     const GOOGLE_URL: &str = "https://www.google.com/search";
     let a_tag_selector = Selector::parse("a").unwrap();
     let footer_selector = Selector::parse("footer").unwrap();
@@ -299,7 +303,7 @@ async fn extract_data_from_google_search_with_reqwest(
                     true => match html_content.contains("did not match any documents") {
                         true => {
                             log::error!("Found no results on query: {}", query.q);
-                            return Ok(GoogleSearchResult::NotFound);
+                            return GoogleSearchResult::NotFound;
                         }
                         false => {
                             log::error!("Blocked by captcha on query: {}", query.q);
@@ -332,20 +336,20 @@ async fn extract_data_from_google_search_with_reqwest(
                                 next_page_url.is_some()
                             );
 
-                            return Ok(GoogleSearchResult::Domains {
+                            return GoogleSearchResult::Domains {
                                 domain_urls: links,
                                 next_page_url,
-                            });
+                            };
                         }
                         GoogleSearchType::Founder(ref domain) => {
                             log::info!("Found {} h3_tags| Potential founder names", headings.len(),);
 
                             let elements = headings.into_iter().map(FounderElement::H3).collect();
 
-                            return Ok(GoogleSearchResult::Founders(FounderTagCandidate {
+                            return GoogleSearchResult::Founders(FounderTagCandidate {
                                 elements,
                                 domain: domain.to_string(),
-                            }));
+                            });
                         }
                     },
                 }
@@ -357,10 +361,7 @@ async fn extract_data_from_google_search_with_reqwest(
         }
     }
 
-    Err(WebDriverError::RequestFailed(format!(
-        "{} retries exceeded",
-        NUM_CAPTCHA_RETRIES
-    )))
+    GoogleSearchResult::CaptchaBlocked
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -394,26 +395,27 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
                 // TODO: Fetch query / url from db instead
                 let query = build_founder_seach_query(domain.clone());
 
-                if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
+                let google_search_result = extract_data_from_google_search_with_reqwest(
                     query.to_string(),
                     GoogleSearchType::Founder(domain.to_string()),
                 )
-                .await
-                {
-                    match google_search_result {
-                        GoogleSearchResult::NotFound => FounderThreadResult::NotFounder(domain),
-                        GoogleSearchResult::Domains { .. } => {
-                            log::error!("Returning domains from founder google search");
-                            FounderThreadResult::Ignore
-                        }
-                        GoogleSearchResult::Founders(tag_candidate) => {
-                            let founder_names = extract_founder_names(tag_candidate.clone());
+                .await;
 
-                            FounderThreadResult::Insert(tag_candidate, founder_names, domain)
-                        }
+                match google_search_result {
+                    GoogleSearchResult::NotFound => FounderThreadResult::NotFounder(domain),
+                    GoogleSearchResult::Domains { .. } => {
+                        log::error!("Returning domains from founder google search");
+                        FounderThreadResult::Ignore
                     }
-                } else {
-                    FounderThreadResult::Ignore
+                    GoogleSearchResult::Founders(tag_candidate) => {
+                        let founder_names = extract_founder_names(tag_candidate.clone());
+
+                        FounderThreadResult::Insert(tag_candidate, founder_names, domain)
+                    }
+                    GoogleSearchResult::CaptchaBlocked => {
+                        log::error!("Returning from captcha blocked on url {}", query);
+                        FounderThreadResult::Ignore
+                    }
                 }
             }));
         }
