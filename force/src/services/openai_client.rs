@@ -28,21 +28,12 @@ impl OpenaiClient {
 
     pub async fn get_boolean_searches_from_niche(
         &self,
-        niche: &str,
+        prompt: &str,
     ) -> Result<Vec<String>, Box<dyn Error>> {
         let request = CreateChatCompletionRequestArgs::default()
             .model("gpt-4o-mini")
             .messages([ChatCompletionRequestUserMessageArgs::default()
-                .content(format!(
-                    r#"
-                    Give different names for the following product: {}
-                    For example for product "yoga mat" similar products will be like: yoga block, silk yoga mat, yellow yoga mat, yoga mat bag, workout mat.
-                    Only return 10 product names in a list but don't start with a bullet point.
-                    Do not give numbers to products.
-                    Give each product on a new line.
-                    "#,
-                    niche
-                ))
+                .content(prompt)
                 .build()?
                 .into()])
             .max_tokens(1000_u32)

@@ -1,6 +1,6 @@
 use fake_user_agent::get_rua;
 use rand::seq::SliceRandom;
-use serde_json::{json, to_string};
+use serde_json::json;
 use thirtyfour::{
     CapabilitiesHelper, ChromiumLikeCapabilities, DesiredCapabilities, Proxy, WebDriver,
 };

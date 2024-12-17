@@ -7,11 +7,13 @@ use thirtyfour::error::WebDriverError;
 use url::Url;
 
 use crate::{
-    dal::lead_db::{self, EmailReachability, EmailVerifiedStatus},
+    dal::{
+        config_db,
+        lead_db::{self, EmailReachability, EmailVerifiedStatus},
+    },
     services::{get_random_proxy, OpenaiClient, Sentinel},
 };
 
-const DEPTH_GOOGLE_SEACH_PAGES: u8 = 1; // Should be > 0
 const NUM_CAPTCHA_RETRIES: u8 = 100; // Should be > 0
 
 #[derive(Deserialize)]
@@ -45,7 +47,14 @@ async fn get_leads_from_niche(
             .await
             .unwrap();
 
-    save_urls_from_google_searche_batch(&pool, domain_search_queries).await;
+    let page_depth = config_db::get_google_search_page_depth(&pool)
+        .await
+        .unwrap_or(Some("1".to_string()))
+        .unwrap_or("1".to_string())
+        .parse()
+        .unwrap_or(1);
+
+    save_urls_from_google_searche_batch(&pool, domain_search_queries, page_depth).await;
 
     let domains_result = lead_db::get_domains_for_niche(&body.niche, &pool).await;
     if let Err(error) = domains_result {
@@ -103,8 +112,21 @@ async fn get_product_search_queries(
         return search_queries;
     }
 
+    let (left_prompt, right_prompt) = config_db::get_gippity_prompt(pool).await.unwrap();
+    let prompt = format!(
+        "{} {} {}",
+        left_prompt.unwrap_or("Give different names for the following product:".to_string()),
+        niche,
+        right_prompt.unwrap_or(r#"
+            For example for product "yoga mat" similar products will be like: yoga block, silk yoga mat, yellow yoga mat, yoga mat bag, workout mat.
+            Only return 10 product names in a list but don't start with a bullet point.
+            Do not give numbers to products.
+            Give each product on a new line.
+        "#.to_string())
+    );
+
     let products = openai_client
-        .get_boolean_searches_from_niche(niche)
+        .get_boolean_searches_from_niche(&prompt)
         .await
         .unwrap();
 
@@ -118,7 +140,11 @@ async fn get_product_search_queries(
     search_queries
 }
 
-async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<String>) {
+async fn save_urls_from_google_searche_batch(
+    pool: &PgPool,
+    search_queries: Vec<String>,
+    page_depth: u8,
+) {
     const BATCH_SIZE: usize = 100;
 
     for batch in search_queries.chunks(BATCH_SIZE) {
@@ -134,7 +160,7 @@ async fn save_urls_from_google_searche_batch(pool: &PgPool, search_queries: Vec<
                 let mut domain_urls_list: Vec<String> = vec![];
                 let mut not_found = false;
 
-                for _ in 0..DEPTH_GOOGLE_SEACH_PAGES {
+                for _ in 0..page_depth {
                     if let Ok(google_search_result) = extract_data_from_google_search_with_reqwest(
                         query.clone(),
                         GoogleSearchType::Domain(current_url.clone()),

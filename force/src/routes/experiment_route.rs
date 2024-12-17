@@ -1,4 +1,4 @@
-use actix_web::{get, web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use scraper::{selectable::Selectable, Html, Selector};
@@ -8,7 +8,10 @@ use thirtyfour::{CapabilitiesHelper, DesiredCapabilities, Proxy, WebDriver};
 use uuid::Uuid;
 
 use crate::{
-    dal::lead_db::{self, ElementType},
+    dal::{
+        config_db,
+        lead_db::{self, ElementType},
+    },
     services::{get_random_proxy, Droid, OpenaiClient, Sentinel},
 };
 
@@ -421,6 +424,36 @@ async fn insert_bulk_products(
 
     _ = lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, &pool)
         .await;
+
+    HttpResponse::Ok().body("Done!")
+}
+
+#[derive(Deserialize)]
+struct SetConfigBody {
+    key: String,
+    value: String,
+}
+
+#[post("/set-config")]
+async fn set_config(pool: web::Data<PgPool>, body: web::Json<SetConfigBody>) -> HttpResponse {
+    match body.key.as_str() {
+        "chatgpt-products-for-niche-start" => {
+            config_db::set_gippity_prompt(Some(&body.value), None, &pool)
+                .await
+                .unwrap();
+        }
+        "chatgpt-products-for-niche-end" => {
+            config_db::set_gippity_prompt(None, Some(&body.value), &pool)
+                .await
+                .unwrap();
+        }
+        "google-search-domain-page-depth" => {
+            config_db::set_google_search_page_depth(body.value.parse().unwrap_or(1), &pool)
+                .await
+                .unwrap();
+        }
+        _ => return HttpResponse::Ok().body(format!("Setting wrong configuration: {}", body.key)),
+    }
 
     HttpResponse::Ok().body("Done!")
 }
