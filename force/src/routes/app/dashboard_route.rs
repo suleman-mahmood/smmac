@@ -12,12 +12,36 @@ use crate::dal::{
 #[template(path = "dashboard.html")]
 struct DashboardTemplate {
     products: Vec<ProductRow>,
+    gpt_prompt: String,
+    page_depth: u8,
 }
 
 #[get("/dashboard")]
 async fn dashboard(pool: web::Data<PgPool>) -> HttpResponse {
     let products = app_db::get_product_table(&pool).await.unwrap_or(vec![]);
-    HttpResponse::Ok().body(DashboardTemplate { products }.render().unwrap())
+
+    let (left, right) = config_db::get_gippity_prompt(&pool).await.unwrap();
+    let gpt_prompt = format!(
+        "{} Million $ startups {}",
+        left.unwrap_or("No left prompt exists in db ||".to_string()),
+        right.unwrap_or("|| No right prompt exists in db".to_string())
+    );
+    let page_depth = config_db::get_google_search_page_depth(&pool)
+        .await
+        .unwrap()
+        .unwrap_or("1".to_string())
+        .parse()
+        .unwrap();
+
+    HttpResponse::Ok().body(
+        DashboardTemplate {
+            products,
+            gpt_prompt,
+            page_depth,
+        }
+        .render()
+        .unwrap(),
+    )
 }
 
 #[derive(Deserialize)]

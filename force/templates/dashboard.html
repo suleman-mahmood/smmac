@@ -8,7 +8,22 @@
 <div class="hero bg-base-200">
   <div class="hero-content flex flex-col">
 
-    <h2>Configurations you can set:</h2>
+    <div class="flex flex-row justify-center items-center content-center">
+      <div class="chat chat-start">
+        <div class="chat-bubble">
+          {{ gpt_prompt }}
+        </div>
+      </div>
+
+      <div class="stats shadow">
+        <div class="stat">
+          <div class="stat-title">Current Google search max page depth</div>
+          <div class="stat-value">{{ page_depth }}</div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="text-xl">Configurations you can set</h2>
     <ul>
       <li>chatgpt-products-for-niche-start</li>
       <li>chatgpt-products-for-niche-end</li>
