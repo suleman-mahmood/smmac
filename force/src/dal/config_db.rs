@@ -40,11 +40,13 @@ pub async fn set_gippity_prompt(
     if let Some(start) = start {
         sqlx::query!(
             r#"
-        update configuration set
-            value = $1
-        where
-            key = 'chatgpt-products-for-niche-start'
-        "#,
+            insert into configuration
+                (key, value)
+            values
+                ('chatgpt-products-for-niche-start', $1)
+            on conflict(key) do update set
+                value = $1
+            "#,
             start
         )
         .execute(pool)
@@ -54,11 +56,13 @@ pub async fn set_gippity_prompt(
     if let Some(end) = end {
         sqlx::query!(
             r#"
-        update configuration set
-            value = $1
-        where
-            key = 'chatgpt-products-for-niche-end'
-        "#,
+            insert into configuration
+                (key, value)
+            values
+                ('chatgpt-products-for-niche-end', $1)
+            on conflict(key) do update set
+                value = $1
+            "#,
             end
         )
         .execute(pool)
@@ -89,10 +93,12 @@ pub async fn set_google_search_page_depth(
 ) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!(
         r#"
-        update configuration set
+        insert into configuration
+            (key, value)
+        values
+            ('google-search-domain-page-depth', $1)
+        on conflict(key) do update set
             value = $1
-        where
-            key = 'google-search-domain-page-depth'
         "#,
         depth.to_string()
     )

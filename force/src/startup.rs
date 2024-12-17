@@ -57,7 +57,8 @@ pub fn run(
                     .service(domain_route::domain)
                     .service(founder_route::founder)
                     .service(email_route::email)
-                    .service(dashboard_route::dashboard),
+                    .service(dashboard_route::dashboard)
+                    .service(dashboard_route::set_config),
             )
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())

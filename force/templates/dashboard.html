@@ -6,7 +6,54 @@
 
 
 <div class="hero bg-base-200">
-  <div class="hero-content">
+  <div class="hero-content flex flex-col">
+
+    <h2>Configurations you can set:</h2>
+    <ul>
+      <li>chatgpt-products-for-niche-start</li>
+      <li>chatgpt-products-for-niche-end</li>
+      <li>google-search-domain-page-depth</li>
+    </ul>
+
+    <div class="card bg-base-100 w-full max-w-sm shrink-0 shadow-2xl">
+      <form
+        class="card-body"
+        hx-post="/app/set-config"
+        hx-swap="none"
+        hx-confirm="Change configuration?"
+      >
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">Key</span>
+          </label>
+          <input
+            name="key"
+            type="text"
+            placeholder="config-key"
+            class="input input-bordered"
+            required
+          />
+        </div>
+
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">Value</span>
+          </label>
+          <input
+            name="value"
+            type="text"
+            placeholder="config value"
+            class="input input-bordered"
+            required
+          />
+        </div>
+
+        <div class="form-control mt-6">
+          <button class="btn btn-primary">Config!</button>
+        </div>
+      </form>
+    </div>
+
     <!-- All niches -->
     <div class="overflow-x-auto">
       <table class="table table-xs table-pin-rows table-pin-cols">
