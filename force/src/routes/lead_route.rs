@@ -3,7 +3,6 @@ use check_if_email_exists::Reachable;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sqlx::{Acquire, PgPool};
-use thirtyfour::error::WebDriverError;
 use url::Url;
 
 use crate::{
@@ -40,9 +39,11 @@ async fn get_leads_from_niche(
     6. Return verified leads (emails)
     */
 
-    save_product_search_queries(&pool, &openai_client, &body.niche).await;
+    let niche = body.niche.trim().to_lowercase();
 
-    let domain_search_queries = lead_db::get_unscraped_products(&body.niche, &pool)
+    save_product_search_queries(&pool, &openai_client, &niche).await;
+
+    let domain_search_queries = lead_db::get_unscraped_products(&niche, &pool)
         .await
         .unwrap();
 
@@ -55,18 +56,14 @@ async fn get_leads_from_niche(
 
     save_urls_from_google_searche_batch(&pool, domain_search_queries, page_depth).await;
 
-    let domains_result = lead_db::get_domains_for_niche(&body.niche, &pool).await;
+    let domains_result = lead_db::get_domains_for_niche(&niche, &pool).await;
     if let Err(error) = domains_result {
         return HttpResponse::Ok().body(format!("Got error while fetching domains: {:?}", error));
     }
     let domains = domains_result.unwrap();
 
     log::info!(">>> >>> >>>");
-    log::info!(
-        "Got {} unique domains for niche {}",
-        domains.len(),
-        &body.niche
-    );
+    log::info!("Got {} unique domains for niche {}", domains.len(), &niche);
     log::info!(">>> >>> >>>");
 
     let domains = lead_db::get_unscraped_domains(domains, &pool)
@@ -77,7 +74,7 @@ async fn get_leads_from_niche(
 
     construct_emails(&pool, domains).await;
 
-    let raw_emails_result = lead_db::get_raw_pending_emails_for_niche(&body.niche, &pool).await;
+    let raw_emails_result = lead_db::get_raw_pending_emails_for_niche(&niche, &pool).await;
     if let Err(error) = raw_emails_result {
         return HttpResponse::Ok()
             .body(format!("Got error while fetching raw emails: {:?}", error));
@@ -90,7 +87,7 @@ async fn get_leads_from_niche(
 
     verify_emails(&pool, sentinel, raw_emails).await;
 
-    match lead_db::get_verified_emails_for_niche(&body.niche, &pool).await {
+    match lead_db::get_verified_emails_for_niche(&niche, &pool).await {
         Ok(verified_emails) => match verified_emails.is_empty() {
             true => HttpResponse::Ok().body("No verified emails found"),
             false => HttpResponse::Ok().json(verified_emails),
@@ -127,10 +124,7 @@ async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient
         .await
         .unwrap();
 
-    let search_queries: Vec<String> = products
-        .iter()
-        .map(|p| build_seach_query(p.to_string()))
-        .collect();
+    let search_queries: Vec<String> = products.iter().map(|p| build_seach_query(p)).collect();
 
     _ = lead_db::insert_niche_products(products, search_queries, niche, pool).await;
 }
@@ -197,7 +191,7 @@ async fn save_urls_from_google_searche_batch(
                 let founder_search_queries: Vec<Option<String>> = domains
                     .clone()
                     .into_iter()
-                    .map(|dom| dom.map(build_founder_seach_query))
+                    .map(|dom| dom.as_deref().map(build_founder_seach_query))
                     .collect();
 
                 (
@@ -393,7 +387,7 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
 
             handles.push(tokio::spawn(async move {
                 // TODO: Fetch query / url from db instead
-                let query = build_founder_seach_query(domain.clone());
+                let query = build_founder_seach_query(&domain);
 
                 let google_search_result = extract_data_from_google_search_with_reqwest(
                     query.to_string(),
@@ -447,13 +441,16 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
     }
 }
 
-pub fn build_seach_query(product: String) -> String {
-    format!(r#""{}" AND "buy now""#, product)
+pub fn build_seach_query(product: &str) -> String {
+    format!(r#""{}" AND "buy now""#, product.to_lowercase())
 }
 
 // TODO: Add more build search query permutations as needed
-pub fn build_founder_seach_query(domain: String) -> String {
-    format!(r#"site:linkedin.com "{}" AND "founder""#, domain)
+pub fn build_founder_seach_query(domain: &str) -> String {
+    format!(
+        r#"site:linkedin.com "{}" AND "founder""#,
+        domain.to_lowercase()
+    )
 }
 
 pub fn get_domain_from_url(url: &str) -> Option<String> {
@@ -472,8 +469,8 @@ pub fn get_domain_from_url(url: &str) -> Option<String> {
                         None
                     } else {
                         match any_host.strip_prefix("www.") {
-                            Some(h) => Some(h.to_string()),
-                            None => Some(any_host.to_string()),
+                            Some(h) => Some(h.to_lowercase()),
+                            None => Some(any_host.to_lowercase()),
                         }
                     }
                 }

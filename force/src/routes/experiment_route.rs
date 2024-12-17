@@ -199,7 +199,7 @@ async fn extract_domain_from_candidate_url(pool: web::Data<PgPool>) -> HttpRespo
     let founder_search_queries: Vec<Option<String>> = domains
         .clone()
         .into_iter()
-        .map(|dom| dom.map(lead_route::build_founder_seach_query))
+        .map(|dom| dom.as_deref().map(lead_route::build_founder_seach_query))
         .collect();
 
     for ((url, dom), new_query) in candidate_urls
@@ -419,7 +419,7 @@ async fn insert_bulk_products(
 
     let search_queries: Vec<String> = products
         .iter()
-        .map(|p| lead_route::build_seach_query(p.to_string()))
+        .map(|p| lead_route::build_seach_query(p))
         .collect();
 
     _ = lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, &pool)
