@@ -15,6 +15,7 @@ use crate::{
 };
 
 const NUM_CAPTCHA_RETRIES: u8 = 100; // Should be > 0
+pub const FRESH_RESULTS: bool = true; // Default to false
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -39,13 +40,11 @@ async fn get_leads_from_niche(
     6. Return verified leads (emails)
     */
 
-    let domain_search_queries =
-        get_product_search_queries(&pool, &openai_client, &body.niche).await;
+    save_product_search_queries(&pool, &openai_client, &body.niche).await;
 
-    let domain_search_queries =
-        lead_db::get_unscraped_products(domain_search_queries, &body.niche, &pool)
-            .await
-            .unwrap();
+    let domain_search_queries = lead_db::get_unscraped_products(&body.niche, &pool)
+        .await
+        .unwrap();
 
     let page_depth = config_db::get_google_search_page_depth(&pool)
         .await
@@ -103,13 +102,11 @@ async fn get_leads_from_niche(
     }
 }
 
-async fn get_product_search_queries(
-    pool: &PgPool,
-    openai_client: &OpenaiClient,
-    niche: &str,
-) -> Vec<String> {
-    if let Ok(Some(search_queries)) = lead_db::get_product_search_queries(niche, pool).await {
-        return search_queries;
+async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient, niche: &str) {
+    if !FRESH_RESULTS {
+        if let Ok(Some(_)) = lead_db::get_product_search_queries(niche, pool).await {
+            return;
+        }
     }
 
     let (left_prompt, right_prompt) = config_db::get_gippity_prompt(pool).await.unwrap();
@@ -135,9 +132,7 @@ async fn get_product_search_queries(
         .map(|p| build_seach_query(p.to_string()))
         .collect();
 
-    _ = lead_db::insert_niche_products(products.clone(), search_queries.clone(), niche, pool).await;
-
-    search_queries
+    _ = lead_db::insert_niche_products(products, search_queries, niche, pool).await;
 }
 
 async fn save_urls_from_google_searche_batch(

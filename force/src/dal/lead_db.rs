@@ -6,7 +6,7 @@ use sqlx::{postgres::PgQueryResult, PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::routes::lead_route::{
-    FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate,
+    FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate, FRESH_RESULTS,
 };
 
 pub async fn get_product_search_queries(
@@ -40,7 +40,21 @@ pub async fn insert_niche_products(
     niche: &str,
     pool: &PgPool,
 ) -> Result<PgQueryResult, sqlx::Error> {
-    let total_rows = products.len();
+    let existing_products =
+        sqlx::query_scalar!("select product from product where niche = $1", niche)
+            .fetch_all(pool)
+            .await
+            .unwrap_or(vec![]);
+
+    let p_and_q: Vec<(String, String)> = products
+        .into_iter()
+        .zip(search_queries.into_iter())
+        .filter(|(pro, _)| !existing_products.contains(pro))
+        .collect();
+    let products: Vec<String> = p_and_q.iter().map(|(p, _)| p.to_string()).collect();
+    let search_queries: Vec<String> = p_and_q.iter().map(|(_, q)| q.to_string()).collect();
+
+    let total_rows = p_and_q.len();
     let ids: Vec<Uuid> = (0..total_rows).map(|_| Uuid::new_v4()).collect();
     let niche: Vec<String> = (0..total_rows).map(|_| niche.to_string()).collect();
 
@@ -86,7 +100,6 @@ pub async fn get_domains_for_niche(niche: &str, pool: &PgPool) -> Result<Vec<Str
 }
 
 pub async fn get_unscraped_products(
-    products: Vec<String>,
     niche: &str,
     pool: &PgPool,
 ) -> Result<Vec<String>, sqlx::Error> {
@@ -97,13 +110,17 @@ pub async fn get_unscraped_products(
         from
             product
         where
-            domain_search_url = any($1) and
+            niche = $1 and
             no_results = False
         "#,
-        &products
+        niche
     )
     .fetch_all(pool)
     .await?;
+
+    if FRESH_RESULTS {
+        return Ok(products);
+    }
 
     let scraped_products = sqlx::query_scalar!(
         r#"
@@ -113,7 +130,6 @@ pub async fn get_unscraped_products(
             domain d
             join product p on p.id = d.product_id
         where
-            d.domain is not null and
             p.niche = $1
         "#,
         niche
