@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into configuration\n            (key, value)\n        values\n            ('google-search-domain-page-depth', $1)\n        on conflict(key) do update set\n            value = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "edae137d34151fb9d01bff9cd0cdcd62505ee8ebd21e7fad7b96126b20aedc1e"
+}

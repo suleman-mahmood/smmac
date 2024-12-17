@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into configuration\n                (key, value)\n            values\n                ('chatgpt-products-for-niche-end', $1)\n            on conflict(key) do update set\n                value = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cb369f7f62b4d55e801d17b1c44503376dd3f89ba161f30d7388e07c79295d37"
+}

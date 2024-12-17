@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            value\n        from\n            configuration\n        where\n            key = 'chatgpt-products-for-niche-start'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8c220342bfab894f8f0f24aaac46cf4c6293c8ca23c5ca2b930ddac4ea952d54"
+}
