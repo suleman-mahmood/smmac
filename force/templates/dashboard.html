@@ -69,6 +69,7 @@
       </form>
     </div>
 
+    <h2 class="mt-8 text-xl">Number of unique domains for a niche and product</h2>
 
     <div class="overflow-x-auto">
       <table class="table table-xs table-pin-rows table-pin-cols">
@@ -84,12 +85,14 @@
           <tr>
             <td>{{ ds.niche }}</td>
             <td>{{ ds.product }}</td>
-            <td>{% if let Some(ud) = ds.unique_domains %} ud {% else %} 0 {% endif %}</td>
+            <td>{% if let Some(ud) = ds.unique_domains %} {{ ud }} {% else %} 0 {% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    <h2 class="mt-8 text-xl">Number of founder domains for a niche, product and domain</h2>
 
     <div class="overflow-x-auto">
       <table class="table table-xs table-pin-rows table-pin-cols">
@@ -107,12 +110,14 @@
             <td>{{ fs.niche }}</td>
             <td>{{ fs.product }}</td>
             <td>{{ fs.domain }}</td>
-            <td>{% if let Some(uf) = fs.unique_founders %} uf {% else %} 0 {% endif %}</td>
+            <td>{% if let Some(uf) = fs.unique_founders %} {{ uf }} {% else %} 0 {% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    <h2 class="mt-8 text-xl">Number of verified emails for a niche, product and domain</h2>
 
     <div class="overflow-x-auto">
       <table class="table table-xs table-pin-rows table-pin-cols">
@@ -132,9 +137,9 @@
             <td>{{ es.niche }}</td>
             <td>{{ es.product }}</td>
             <td>{{ es.domain }}</td>
-            <td>{% if let Some(fn) = es.founder_name %} fn {% endif %}</td>
+            <td>{% if let Some(fn) = es.founder_name %} {{ fn }} {% endif %}</td>
             <td>{{ es.verified_status }}</td>
-            <td>{% if let Some(ue) = es.unique_emails %} ue {% else %} 0 {% endif %}</td>
+            <td>{% if let Some(ue) = es.unique_emails %} {{ ue }} {% else %} 0 {% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
