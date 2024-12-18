@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            p.niche,\n            p.product,\n            f.domain,\n            f.founder_name,\n            e.verified_status as \"verified_status: EmailVerifiedStatus\",\n            count(distinct e.email_address) as unique_emails\n        from\n            email e\n            join founder f on f.id = e.founder_id\n            join domain d on d.domain = f.domain\n            join product p on p.id = d.product_id\n        group by\n            p.niche, p.product, f.domain, f.founder_name, e.verified_status\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "niche",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "product",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "founder_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "verified_status: EmailVerifiedStatus",
+        "type_info": {
+          "Custom": {
+            "name": "emailverifiedstatus",
+            "kind": {
+              "Enum": [
+                "PENDING",
+                "VERIFIED",
+                "INVALID"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "unique_emails",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "b8771efaeef8bc95d1b5b706222e813312792523668ad64398fe53259686d1bf"
+}
