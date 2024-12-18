@@ -479,6 +479,38 @@ pub async fn get_verified_emails_for_niche(
     .await
 }
 
+pub async fn get_catch_all_emails_for_niche(
+    niche: &str,
+    pool: &PgPool,
+) -> Result<Vec<String>, sqlx::Error> {
+    let rows = sqlx::query!(
+        r#"
+        select
+            array_agg(distinct e.email_address) as email_addresses
+        from
+            email e
+            join founder f on f.id = e.founder_id
+            join domain d on d.domain = f.domain
+            join product p on p.id = d.product_id
+        where
+            p.niche = $1 and
+            e.verified_status = 'VERIFIED'
+        group by
+            f.domain, f.founder_name
+        having
+            count(distinct e.email_address) > 2
+        "#,
+        niche
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let rows: Vec<Vec<String>> = rows.into_iter().filter_map(|r| r.email_addresses).collect();
+    let emails = rows.into_iter().flatten().collect();
+
+    Ok(emails)
+}
+
 pub async fn get_raw_pending_emails_for_niche(
     niche: &str,
     pool: &PgPool,

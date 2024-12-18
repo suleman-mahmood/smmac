@@ -77,13 +77,11 @@ async fn get_leads_from_niche(
         })
         .collect();
 
-    log::info!(">>> >>> >>>");
     log::info!(
         "Finding founders for {} unique domains for niche {}",
         domains.len(),
         &niche
     );
-    log::info!(">>> >>> >>>");
 
     save_founders_from_google_searches_batch(&pool, domains.clone()).await;
 
@@ -96,16 +94,32 @@ async fn get_leads_from_niche(
     }
     let raw_emails = raw_emails_result.unwrap();
 
-    log::info!(">>> >>> >>>");
     log::info!("Emails to verify: {}", raw_emails.len());
-    log::info!(">>> >>> >>>");
 
     verify_emails(&pool, sentinel, raw_emails).await;
 
     match lead_db::get_verified_emails_for_niche(&niche, &pool).await {
         Ok(verified_emails) => match verified_emails.is_empty() {
             true => HttpResponse::Ok().body("No verified emails found"),
-            false => HttpResponse::Ok().json(verified_emails),
+            false => {
+                let catch_all_emails = lead_db::get_catch_all_emails_for_niche(&niche, &pool)
+                    .await
+                    .unwrap();
+
+                log::info!("Found {} total verified emails", verified_emails.len());
+                log::info!("Found {} catch all emails", catch_all_emails.len());
+                log::info!(
+                    "Found {} valid verified emails",
+                    verified_emails.len() - catch_all_emails.len()
+                );
+
+                let valid_emails: Vec<String> = verified_emails
+                    .into_iter()
+                    .filter(|e| !catch_all_emails.contains(e))
+                    .collect();
+
+                HttpResponse::Ok().json(valid_emails)
+            }
         },
         Err(e) => {
             log::error!("Error getting verified emails from db: {:?}", e);
