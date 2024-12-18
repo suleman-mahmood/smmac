@@ -15,6 +15,7 @@ use crate::{
 
 const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
 pub const FRESH_RESULTS: bool = true; // Default to false
+const BLACK_LIST_DOMAINS: [&str; 4] = ["reddit", "youtube", "pinterest", "amazon", "linkedin"];
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
@@ -62,13 +63,27 @@ async fn get_leads_from_niche(
     }
     let domains = domains_result.unwrap();
 
-    log::info!(">>> >>> >>>");
-    log::info!("Got {} unique domains for niche {}", domains.len(), &niche);
-    log::info!(">>> >>> >>>");
-
     let domains = lead_db::get_unscraped_domains(domains, &pool)
         .await
         .unwrap();
+
+    // Remove blacklisted domains
+    let domains: Vec<String> = domains
+        .into_iter()
+        .filter(|d| {
+            !BLACK_LIST_DOMAINS
+                .iter()
+                .any(|&blacklist| d.contains(blacklist))
+        })
+        .collect();
+
+    log::info!(">>> >>> >>>");
+    log::info!(
+        "Finding founders for {} unique domains for niche {}",
+        domains.len(),
+        &niche
+    );
+    log::info!(">>> >>> >>>");
 
     save_founders_from_google_searches_batch(&pool, domains.clone()).await;
 
