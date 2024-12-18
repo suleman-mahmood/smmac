@@ -69,30 +69,78 @@
       </form>
     </div>
 
-    <!-- All niches -->
+
     <div class="overflow-x-auto">
       <table class="table table-xs table-pin-rows table-pin-cols">
         <thead>
           <tr>
             <th>Niche</th>
             <th>Product</th>
-            <th>Is page empty?</th>
-            <th></th>
-            <th></th>
-            <th></th>
+            <th>Unique domains</th>
           </tr>
         </thead>
         <tbody>
-          {% for p in products %}
+          {% for ds in domain_stats %}
           <tr>
-            <td>{{ p.niche }}</td>
-            <td>{{ p.product }}</td>
-            <td>{% if p.no_results %} Yes {% else %} No {% endif %}</td>
+            <td>{{ ds.niche }}</td>
+            <td>{{ ds.product }}</td>
+            <td>{% if let Some(ud) = ds.unique_domains %} ud {% else %} 0 {% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    <div class="overflow-x-auto">
+      <table class="table table-xs table-pin-rows table-pin-cols">
+        <thead>
+          <tr>
+            <th>Niche</th>
+            <th>Product</th>
+            <th>Domain</th>
+            <th>Unique founders</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fs in founder_stats %}
+          <tr>
+            <td>{{ fs.niche }}</td>
+            <td>{{ fs.product }}</td>
+            <td>{{ fs.domain }}</td>
+            <td>{% if let Some(uf) = fs.unique_founders %} uf {% else %} 0 {% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="table table-xs table-pin-rows table-pin-cols">
+        <thead>
+          <tr>
+            <th>Niche</th>
+            <th>Product</th>
+            <th>Domain</th>
+            <th>Founder name</th>
+            <th>Verified status</th>
+            <th>Unique emails</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for es in email_stats %}
+          <tr>
+            <td>{{ es.niche }}</td>
+            <td>{{ es.product }}</td>
+            <td>{{ es.domain }}</td>
+            <td>{% if let Some(fn) = es.founder_name %} fn {% endif %}</td>
+            <td>{{ es.verified_status }}</td>
+            <td>{% if let Some(ue) = es.unique_emails %} ue {% else %} 0 {% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 

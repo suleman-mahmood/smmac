@@ -4,22 +4,22 @@ use serde::Deserialize;
 use sqlx::PgPool;
 
 use crate::dal::{
-    app_db::{self, ProductRow},
     config_db,
+    stat_db::{self, DomainStat, EmailStat, FounderStat},
 };
 
 #[derive(Template)]
 #[template(path = "dashboard.html")]
 struct DashboardTemplate {
-    products: Vec<ProductRow>,
+    domain_stats: Vec<DomainStat>,
+    founder_stats: Vec<FounderStat>,
+    email_stats: Vec<EmailStat>,
     gpt_prompt: String,
     page_depth: u8,
 }
 
 #[get("/dashboard")]
 async fn dashboard(pool: web::Data<PgPool>) -> HttpResponse {
-    let products = app_db::get_product_table(&pool).await.unwrap_or(vec![]);
-
     let (left, right) = config_db::get_gippity_prompt(&pool).await.unwrap();
     let gpt_prompt = format!(
         "{} Million $ startups {}",
@@ -33,9 +33,15 @@ async fn dashboard(pool: web::Data<PgPool>) -> HttpResponse {
         .parse()
         .unwrap();
 
+    let domain_stats = stat_db::get_domain_stats(&pool).await.unwrap_or(vec![]);
+    let founder_stats = stat_db::get_founder_stats(&pool).await.unwrap_or(vec![]);
+    let email_stats = stat_db::get_email_stats(&pool).await.unwrap_or(vec![]);
+
     HttpResponse::Ok().body(
         DashboardTemplate {
-            products,
+            domain_stats,
+            founder_stats,
+            email_stats,
             gpt_prompt,
             page_depth,
         }
