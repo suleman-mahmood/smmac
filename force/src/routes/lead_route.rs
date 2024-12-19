@@ -426,16 +426,22 @@ enum FounderThreadResult {
 async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<String>) {
     const BATCH_SIZE: usize = 100;
 
-    for batch in domains.chunks(BATCH_SIZE) {
+    let mut domain_queries = Vec::new();
+    for d in domains.iter() {
+        let founder_queries = build_founder_seach_queries(d);
+        for query in founder_queries {
+            domain_queries.push((d.to_string(), query));
+        }
+    }
+
+    for batch in domain_queries.chunks(BATCH_SIZE) {
         let mut handles = Vec::new();
 
-        for domain in batch {
+        for (domain, query) in batch {
             let domain = domain.clone();
+            let query = query.clone();
 
             handles.push(tokio::spawn(async move {
-                // TODO: Fetch query / url from db instead
-                let query = build_founder_seach_query(&domain);
-
                 let google_search_result = extract_data_from_google_search_with_reqwest(
                     query.to_string(),
                     GoogleSearchType::Founder(domain.to_string()),
@@ -499,7 +505,17 @@ pub fn build_seach_query(product: &str) -> String {
     // format!(r#""{}" AND "buy now""#, product.to_lowercase())
 }
 
-// TODO: Add more build search query permutations as needed
+pub fn build_founder_seach_queries(domain: &str) -> Vec<String> {
+    let titles = ["founder", "ceo", "owner"];
+    let domain = domain.to_lowercase();
+
+    titles
+        .into_iter()
+        .map(|t| format!(r#"site:linkedin.com "{}" AND "{}""#, domain, t))
+        .collect()
+}
+
+// TODO: Remove this
 pub fn build_founder_seach_query(domain: &str) -> String {
     format!(
         r#"site:linkedin.com "{}" AND "founder""#,
