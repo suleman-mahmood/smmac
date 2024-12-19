@@ -15,7 +15,15 @@ use crate::{
 
 const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
 pub const FRESH_RESULTS: bool = true; // Default to false
-const BLACK_LIST_DOMAINS: [&str; 5] = ["reddit", "youtube", "pinterest", "amazon", "linkedin"];
+const BLACK_LIST_DOMAINS: [&str; 7] = [
+    "reddit",
+    "youtube",
+    "pinterest",
+    "amazon",
+    "linkedin",
+    "github",
+    "microsoft",
+];
 
 #[derive(Deserialize)]
 struct GetLeadsFromNicheQuery {
