@@ -495,7 +495,8 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
 }
 
 pub fn build_seach_query(product: &str) -> String {
-    format!(r#""{}" AND "buy now""#, product.to_lowercase())
+    product.to_lowercase()
+    // format!(r#""{}" AND "buy now""#, product.to_lowercase())
 }
 
 // TODO: Add more build search query permutations as needed
