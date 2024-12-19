@@ -184,9 +184,10 @@ async fn save_urls_from_google_searche_batch(
 
                 let mut current_url = None;
                 let mut domain_urls_list: Vec<String> = vec![];
+                let mut page_source_list: Vec<(String, u8)> = vec![];
                 let mut not_found = false;
 
-                for _ in 0..page_depth {
+                for current_page_index in 0..page_depth {
                     let google_search_result = extract_data_from_google_search_with_reqwest(
                         query.clone(),
                         GoogleSearchType::Domain(current_url.clone()),
@@ -198,15 +199,17 @@ async fn save_urls_from_google_searche_batch(
                             not_found = true;
                             break;
                         }
-                        GoogleSearchResult::Founders(_) => {
+                        GoogleSearchResult::Founders(..) => {
                             log::error!("Returning founders from domain google search");
                             break;
                         }
                         GoogleSearchResult::Domains {
                             domain_urls,
                             next_page_url,
+                            page_source,
                         } => {
                             domain_urls_list.extend(domain_urls);
+                            page_source_list.push((page_source, current_page_index + 1));
                             match next_page_url {
                                 Some(url) => current_url = Some(url),
                                 None => break,
@@ -237,6 +240,7 @@ async fn save_urls_from_google_searche_batch(
                     founder_search_queries,
                     query,
                     not_found,
+                    page_source_list,
                 )
             }));
         }
@@ -265,6 +269,7 @@ async fn save_urls_from_google_searche_batch(
                     e,
                 )
             }
+            _ = lead_db::insert_product_page_sources(params.5, &params.3, con).await;
         }
     }
 }
@@ -279,8 +284,9 @@ enum GoogleSearchResult {
     Domains {
         domain_urls: Vec<String>,
         next_page_url: Option<String>,
+        page_source: String,
     },
-    Founders(FounderTagCandidate),
+    Founders(FounderTagCandidate, String),
     CaptchaBlocked,
 }
 
@@ -370,6 +376,7 @@ async fn extract_data_from_google_search_with_reqwest(
                             return GoogleSearchResult::Domains {
                                 domain_urls: links,
                                 next_page_url,
+                                page_source: html_content,
                             };
                         }
                         GoogleSearchType::Founder(ref domain) => {
@@ -377,10 +384,13 @@ async fn extract_data_from_google_search_with_reqwest(
 
                             let elements = headings.into_iter().map(FounderElement::H3).collect();
 
-                            return GoogleSearchResult::Founders(FounderTagCandidate {
-                                elements,
-                                domain: domain.to_string(),
-                            });
+                            return GoogleSearchResult::Founders(
+                                FounderTagCandidate {
+                                    elements,
+                                    domain: domain.to_string(),
+                                },
+                                html_content,
+                            );
                         }
                     },
                 }
@@ -408,7 +418,7 @@ pub struct FounderTagCandidate {
 }
 
 enum FounderThreadResult {
-    Insert(FounderTagCandidate, Vec<Option<String>>, String),
+    Insert(FounderTagCandidate, Vec<Option<String>>, String, String),
     NotFounder(String),
     Ignore,
 }
@@ -438,10 +448,15 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
                         log::error!("Returning domains from founder google search");
                         FounderThreadResult::Ignore
                     }
-                    GoogleSearchResult::Founders(tag_candidate) => {
+                    GoogleSearchResult::Founders(tag_candidate, page_source) => {
                         let founder_names = extract_founder_names(tag_candidate.clone());
 
-                        FounderThreadResult::Insert(tag_candidate, founder_names, domain)
+                        FounderThreadResult::Insert(
+                            tag_candidate,
+                            founder_names,
+                            domain,
+                            page_source,
+                        )
                     }
                     GoogleSearchResult::CaptchaBlocked => {
                         log::error!("Returning from captcha blocked on url {}", query);
@@ -466,8 +481,9 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
 
         for params in handler_results {
             match params {
-                FounderThreadResult::Insert(tag_candidate, founder_names, domain) => {
+                FounderThreadResult::Insert(tag_candidate, founder_names, domain, page_source) => {
                     _ = lead_db::insert_founders(tag_candidate, founder_names, &domain, con).await;
+                    _ = lead_db::insert_domain_page_source(&page_source, &domain, con).await;
                 }
                 FounderThreadResult::NotFounder(domain) => {
                     let _ = lead_db::insert_domain_no_results(&domain, con).await;

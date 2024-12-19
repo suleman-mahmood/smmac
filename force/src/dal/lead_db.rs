@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, i16};
 
 use check_if_email_exists::Reachable;
 use serde::Deserialize;
@@ -202,6 +202,47 @@ pub async fn insert_domain_candidate_urls(
     Ok(())
 }
 
+pub async fn insert_product_page_sources(
+    page_source_list: Vec<(String, u8)>,
+    product_query: &str,
+    con: &mut PgConnection,
+) -> Result<(), sqlx::Error> {
+    let product_id = sqlx::query_scalar!(
+        r#"
+        select id from product where domain_search_url = $1
+        "#,
+        product_query
+    )
+    .fetch_optional(&mut *con)
+    .await?;
+
+    if product_id.is_none() {
+        log::error!("No row found in product for url: {}", product_query);
+        return Ok(());
+    }
+    let product_id = product_id.unwrap();
+
+    for (page_source, page_index) in page_source_list {
+        let page_index = i32::from(page_index);
+
+        _ = sqlx::query!(
+            r#"
+            insert into html_page_source
+                (id, html_page_source, page_number, product_id)
+            values
+                ($1, $2, $3, $4)
+            "#,
+            Uuid::new_v4(),
+            page_source,
+            page_index,
+            product_id,
+        )
+        .execute(&mut *con)
+        .await;
+    }
+    Ok(())
+}
+
 pub async fn get_unscraped_domains(
     domains: Vec<String>,
     pool: &PgPool,
@@ -287,6 +328,44 @@ pub async fn insert_founders(
         .execute(&mut *con)
         .await;
     }
+}
+
+pub async fn insert_domain_page_source(
+    page_source: &str,
+    domain: &str,
+    con: &mut PgConnection,
+) -> Result<(), sqlx::Error> {
+    let domain_id = sqlx::query_scalar!(
+        r#"
+        select id from founder where domain = $1
+        "#,
+        domain
+    )
+    .fetch_optional(&mut *con)
+    .await?;
+
+    if domain_id.is_none() {
+        log::error!("No row found in founder for domain: {}", domain);
+        return Ok(());
+    }
+
+    let domain_id = domain_id.unwrap();
+    _ = sqlx::query!(
+        r#"
+        insert into html_page_source
+            (id, html_page_source, page_number, domain_id)
+        values
+            ($1, $2, $3, $4)
+        "#,
+        Uuid::new_v4(),
+        page_source,
+        1,
+        domain_id,
+    )
+    .execute(&mut *con)
+    .await;
+
+    Ok(())
 }
 
 pub async fn get_founder_domains(
