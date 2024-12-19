@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into html_page_source\n                (id, html_page_source, page_number, product_id)\n            values\n                ($1, $2, $3, $4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8267160da709f67d655f2c6bf52fc082d42c6243aa8fa4ba452b3af9c15e00e8"
+}
