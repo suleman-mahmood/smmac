@@ -12,7 +12,7 @@ use sqlx::PgPool;
 use crate::{
     routes::{
         dashboard_route, default_route, domain_route, email_route, experiment_route, founder_route,
-        lead_route, login_route, product_route,
+        lead_route, login_route, product_route, verified_email_route,
     },
     services::{OpenaiClient, Sentinel},
 };
@@ -58,6 +58,7 @@ pub fn run(
                     .service(founder_route::founder)
                     .service(email_route::email)
                     .service(product_route::product)
+                    .service(verified_email_route::verified_email)
                     .service(dashboard_route::dashboard)
                     .service(dashboard_route::set_config),
             )

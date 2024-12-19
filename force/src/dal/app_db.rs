@@ -115,3 +115,43 @@ pub async fn get_email_table(pool: &PgPool) -> Result<Vec<EmailRow>, sqlx::Error
     .fetch_all(pool)
     .await
 }
+
+pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar!(
+        r#"
+        with filtered_emails as (
+            select
+                email_address
+            from
+                email
+            where
+                verified_status = 'VERIFIED'
+
+            except
+
+            select
+                distinct unnest(array_agg(e.email_address))
+            from
+                email e
+                join founder f on f.id = e.founder_id
+                join domain d on d.domain = f.domain
+                join product p on p.id = d.product_id
+            where
+                e.verified_status = 'VERIFIED'
+            group by
+                f.domain, f.founder_name
+            having
+                count(distinct e.email_address) > 2
+        )
+        select
+            e.email_address
+        from
+            filtered_emails fe
+            join email e on e.email_address = fe.email_address
+        order by
+            e.created_at desc
+        "#
+    )
+    .fetch_all(pool)
+    .await
+}

@@ -4,3 +4,4 @@ pub mod email_route;
 pub mod founder_route;
 pub mod login_route;
 pub mod product_route;
+pub mod verified_email_route;
