@@ -328,7 +328,13 @@ async fn extract_data_from_google_search_with_reqwest(
 
         match req.send().await {
             Ok(res) => {
-                let html_content = res.text().await.unwrap();
+                let html_content_result = res.text().await;
+                if let Err(ref e) = html_content_result {
+                    log::error!("Failed to parse text from html_content. Error: {:?}", e);
+                    retry_count += 1;
+                    continue;
+                }
+                let html_content = html_content_result.unwrap();
                 let html_document = Html::parse_document(&html_content);
 
                 let headings: Vec<String> = html_document
