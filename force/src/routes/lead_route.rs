@@ -315,7 +315,7 @@ async fn extract_data_from_google_search_with_reqwest(
         let client = reqwest::Client::builder()
             .proxy(http_proxy)
             .proxy(https_proxy)
-            .timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(30))
             .build()
             .unwrap();
         let query = GoogleQuery { q: query.clone() };
