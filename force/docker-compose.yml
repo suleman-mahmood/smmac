@@ -82,7 +82,18 @@ services:
       # - "traefik.tcp.services.smmac_postgres.loadbalancer.server.port=5433"
     depends_on:
       - reverse-proxy
-    command: -p 5433
+    command:
+      - "postgres"
+      - "-p"
+      - "5433"
+      - "-c"
+      - "shared_buffers=131072"
+      - "-c"
+      - "effective_cache_size=262144"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "log_min_duration_statement=1000"
     ports:
       - "5433:5433"
 
