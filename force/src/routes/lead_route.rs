@@ -3,6 +3,7 @@ use check_if_email_exists::Reachable;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sqlx::{Acquire, PgPool};
+use tokio::task::JoinSet;
 use url::Url;
 
 use crate::{
@@ -171,15 +172,15 @@ async fn save_urls_from_google_searche_batch(
     search_queries: Vec<String>,
     page_depth: u8,
 ) {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
 
     for batch in search_queries.chunks(BATCH_SIZE) {
-        let mut handles = Vec::new();
+        let mut set = JoinSet::new();
 
         for query in batch {
             let query = query.clone();
 
-            handles.push(tokio::spawn(async move {
+            set.spawn(async move {
                 // Fetch domain urls for url, if exist don't search
 
                 let mut current_url = None;
@@ -242,34 +243,32 @@ async fn save_urls_from_google_searche_batch(
                     not_found,
                     page_source_list,
                 )
-            }));
-        }
-
-        let mut handler_results = vec![];
-
-        for handle in handles {
-            let res = handle.await;
-            if let Ok(r) = res {
-                handler_results.push(r);
-            }
+            });
         }
 
         let mut pool_con = pool.acquire().await.unwrap();
         let con = pool_con.acquire().await.unwrap();
-        for params in handler_results {
-            // Save domain entries
-            if let Err(e) = lead_db::insert_domain_candidate_urls(
-                params.0, params.1, params.2, &params.3, params.4, con,
-            )
-            .await
-            {
-                log::error!(
-                    "Error inserting domain candidate urls in db for url: {} and error: {:?}",
-                    params.3,
-                    e,
-                )
+
+        while let Some(res) = set.join_next().await {
+            if let Ok(r) = res {
+                // Save domain entries
+                if let Err(e) =
+                    lead_db::insert_domain_candidate_urls(r.0, r.1, r.2, &r.3, r.4, con).await
+                {
+                    log::error!(
+                        "Error inserting domain candidate urls in db for url: {} and error: {:?}",
+                        r.3,
+                        e,
+                    )
+                }
+                if let Err(e) = lead_db::insert_product_page_sources(r.5, &r.3, con).await {
+                    log::error!(
+                        "Error inserting product page sources in db for url: {} and error: {:?}",
+                        r.3,
+                        e,
+                    )
+                }
             }
-            _ = lead_db::insert_product_page_sources(params.5, &params.3, con).await;
         }
     }
 }
@@ -430,7 +429,7 @@ enum FounderThreadResult {
 }
 
 async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<String>) {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
 
     let mut domain_queries = Vec::new();
     for d in domains.iter() {
@@ -441,13 +440,13 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
     }
 
     for batch in domain_queries.chunks(BATCH_SIZE) {
-        let mut handles = Vec::new();
+        let mut set = JoinSet::new();
 
         for (domain, query) in batch {
             let domain = domain.clone();
             let query = query.clone();
 
-            handles.push(tokio::spawn(async move {
+            set.spawn(async move {
                 let google_search_result = extract_data_from_google_search_with_reqwest(
                     query.to_string(),
                     GoogleSearchType::Founder(domain.to_string()),
@@ -475,32 +474,31 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
                         FounderThreadResult::Ignore
                     }
                 }
-            }));
+            });
         }
 
-        let mut handler_results = vec![];
-
-        for handle in handles {
-            let res = handle.await;
-            if let Ok(r) = res {
-                handler_results.push(r);
-            }
-        }
-
-        // Save results to db
         let mut pool_con = pool.acquire().await.unwrap();
         let con = pool_con.acquire().await.unwrap();
 
-        for params in handler_results {
-            match params {
-                FounderThreadResult::Insert(tag_candidate, founder_names, domain, page_source) => {
-                    _ = lead_db::insert_founders(tag_candidate, founder_names, &domain, con).await;
-                    _ = lead_db::insert_domain_page_source(&page_source, &domain, con).await;
+        while let Some(res) = set.join_next().await {
+            if let Ok(params) = res {
+                // Save results to db
+                match params {
+                    FounderThreadResult::Insert(
+                        tag_candidate,
+                        founder_names,
+                        domain,
+                        page_source,
+                    ) => {
+                        _ = lead_db::insert_founders(tag_candidate, founder_names, &domain, con)
+                            .await;
+                        _ = lead_db::insert_domain_page_source(&page_source, &domain, con).await;
+                    }
+                    FounderThreadResult::NotFounder(domain) => {
+                        _ = lead_db::insert_domain_no_results(&domain, con).await;
+                    }
+                    FounderThreadResult::Ignore => (),
                 }
-                FounderThreadResult::NotFounder(domain) => {
-                    let _ = lead_db::insert_domain_no_results(&domain, con).await;
-                }
-                FounderThreadResult::Ignore => (),
             }
         }
     }
@@ -718,16 +716,16 @@ fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
 }
 
 async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec<String>) {
-    const BATCH_SIZE: usize = 1000;
+    const BATCH_SIZE: usize = 10000;
 
     for batch in emails.chunks(BATCH_SIZE) {
-        let mut handles = Vec::new();
+        let mut set = JoinSet::new();
 
         for em in batch {
             let sentinel = sentinel.clone();
             let em = em.clone();
 
-            handles.push(tokio::spawn(async move {
+            set.spawn(async move {
                 let reachable = sentinel.get_email_verification_status(&em).await;
                 let status = match reachable {
                     Reachable::Safe => EmailVerifiedStatus::Verified,
@@ -736,25 +734,17 @@ async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec
                 let reachable: EmailReachability = reachable.into();
 
                 (em, status, reachable)
-            }));
+            });
         }
 
-        let mut handler_results = vec![];
-
-        for handle in handles {
-            let res = handle.await;
-            if let Ok(r) = res {
-                handler_results.push(r);
-            }
-        }
-
-        // update in lead db
         let mut pool_con = pool.acquire().await.unwrap();
         let con = pool_con.acquire().await.unwrap();
 
-        for params in handler_results {
-            _ = lead_db::set_email_verification_reachability(&params.0, params.1, params.2, con)
-                .await;
+        while let Some(res) = set.join_next().await {
+            if let Ok(r) = res {
+                // update in lead db
+                _ = lead_db::set_email_verification_reachability(&r.0, r.1, r.2, con).await;
+            }
         }
     }
 }

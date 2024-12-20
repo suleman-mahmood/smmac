@@ -1,4 +1,4 @@
-use std::{fmt::Display, i16};
+use std::fmt::Display;
 
 use check_if_email_exists::Reachable;
 use serde::Deserialize;
