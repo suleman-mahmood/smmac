@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::{types::chrono, PgPool};
 
 use super::lead_db::{EmailReachability, EmailVerifiedStatus};
 
@@ -119,9 +119,10 @@ pub async fn get_email_table(pool: &PgPool) -> Result<Vec<EmailRow>, sqlx::Error
 pub struct VerifiedEmailRow {
     pub email: String,
     pub founder_name: Option<String>,
-    pub domain: String,
-    pub product: String,
-    pub niche: String,
+    pub domain: Option<String>,
+    pub product: Option<String>,
+    pub niche: Option<String>,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<VerifiedEmailRow>, sqlx::Error> {
@@ -154,18 +155,21 @@ pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<VerifiedEmailRow>,
         )
         select
             e.email_address as email,
-            f.founder_name,
-            f.domain,
-            p.product,
-            p.niche
+            (array_agg(f.founder_name))[1] as founder_name,
+            (array_agg(f.domain))[1] as domain,
+            (array_agg(p.product))[1] as product,
+            (array_agg(p.niche))[1] as niche,
+            (array_agg(e.created_at))[1] as created_at
         from
             filtered_emails fe
             join email e on e.email_address = fe.email_address
             join founder f on f.id = e.founder_id
             join domain d on d.domain = f.domain
             join product p on p.id = d.product_id
+        group by
+            e.email_address
         order by
-            e.created_at desc
+            6 desc
         "#
     )
     .fetch_all(pool)
