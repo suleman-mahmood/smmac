@@ -2,12 +2,12 @@ use actix_web::{get, web, HttpResponse};
 use askama::Template;
 use sqlx::PgPool;
 
-use crate::dal::app_db::{self};
+use crate::dal::app_db::{self, VerifiedEmailRow};
 
 #[derive(Template)]
 #[template(path = "verified_email.html")]
 struct VerifiedEmailTemplate {
-    emails: Vec<String>,
+    emails: Vec<VerifiedEmailRow>,
 }
 
 #[get("/verified-email")]

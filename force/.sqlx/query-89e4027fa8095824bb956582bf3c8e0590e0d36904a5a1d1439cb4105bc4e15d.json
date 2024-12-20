@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select niche from product order by created_at desc limit 3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "niche",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "89e4027fa8095824bb956582bf3c8e0590e0d36904a5a1d1439cb4105bc4e15d"
+}

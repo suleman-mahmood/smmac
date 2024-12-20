@@ -116,8 +116,17 @@ pub async fn get_email_table(pool: &PgPool) -> Result<Vec<EmailRow>, sqlx::Error
     .await
 }
 
-pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar!(
+pub struct VerifiedEmailRow {
+    pub email: String,
+    pub founder_name: Option<String>,
+    pub domain: String,
+    pub product: String,
+    pub niche: String,
+}
+
+pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<VerifiedEmailRow>, sqlx::Error> {
+    sqlx::query_as!(
+        VerifiedEmailRow,
         r#"
         with filtered_emails as (
             select
@@ -144,10 +153,17 @@ pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<String>, sqlx::Err
                 count(distinct e.email_address) > 2
         )
         select
-            e.email_address
+            e.email_address as email,
+            f.founder_name,
+            f.domain,
+            p.product,
+            p.niche
         from
             filtered_emails fe
             join email e on e.email_address = fe.email_address
+            join founder f on f.id = e.founder_id
+            join domain d on d.domain = f.domain
+            join product p on p.id = d.product_id
         order by
             e.created_at desc
         "#

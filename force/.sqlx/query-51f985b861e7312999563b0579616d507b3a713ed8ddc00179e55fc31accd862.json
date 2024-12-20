@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        select\n            p.niche,\n            p.product,\n            count(distinct d.domain) as unique_domains\n        from\n            product p\n        join domain d on d.product_id = p.id\n        group by\n            p.niche, p.product\n    ",
+  "query": "\n        select\n            p.niche,\n            p.product,\n            count(distinct d.domain) as unique_domains\n        from\n            product p\n            join domain d on d.product_id = p.id\n        where\n            p.niche = any($1)\n        group by\n            p.niche, p.product\n        ",
   "describe": {
     "columns": [
       {
@@ -20,7 +20,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "TextArray"
+      ]
     },
     "nullable": [
       false,
@@ -28,5 +30,5 @@
       null
     ]
   },
-  "hash": "6e306b1f9344915b68cad740f10960ae8bf6b2130fa056f0fd77ed60c6613c57"
+  "hash": "51f985b861e7312999563b0579616d507b3a713ed8ddc00179e55fc31accd862"
 }

@@ -11,13 +11,23 @@
       <table class="table table-xs table-pin-rows table-pin-cols">
         <thead>
           <tr>
+            <th></th>
             <th>Email</th>
+            <th>Founder name</th>
+            <th>Domain</th>
+            <th>Product</th>
+            <th>Niche</th>
           </tr>
         </thead>
         <tbody>
           {% for e in emails %}
           <tr>
-            <td>{{ e }}</td>
+            <td>{{ loop.index }}</td>
+            <td>{{ e.email }}</td>
+            <td>{% if let Some(fn) = e.founder_name %} {{ fn }} {% endif %}</td>
+            <td>{{ e.domain }}</td>
+            <td>{{ e.product }}</td>
+            <td>{{ e.niche }}</td>
           </tr>
           {% endfor %}
         </tbody>
