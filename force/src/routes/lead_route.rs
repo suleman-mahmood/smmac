@@ -10,8 +10,9 @@ use url::Url;
 
 use crate::{
     dal::{
-        config_db,
+        config_db, google_webpage_db,
         lead_db::{self, EmailReachability, EmailVerifiedStatus},
+        niche_db,
     },
     services::{get_random_proxy, OpenaiClient, Sentinel},
 };
@@ -55,7 +56,13 @@ async fn get_leads_from_niche(
 
     save_product_search_queries(&pool, &openai_client, &niche).await;
 
-    let domain_search_queries = lead_db::get_unscraped_products(&niche, &pool)
+    let niche_obj = niche_db::get_niche(&pool, &niche).await.unwrap();
+    let queries: Vec<String> = niche_obj
+        .generated_products
+        .into_iter()
+        .map(|p| build_seach_query(&p))
+        .collect();
+    let product_queries = google_webpage_db::filter_unscraped_product_queries(&pool, queries)
         .await
         .unwrap();
 
@@ -66,7 +73,7 @@ async fn get_leads_from_niche(
         .parse()
         .unwrap_or(1);
 
-    save_urls_from_google_searche_batch(&pool, domain_search_queries, page_depth).await;
+    save_urls_from_google_searche_batch(&pool, product_queries, page_depth).await;
 
     let domains_result = lead_db::get_domains_for_niche(&niche, &pool).await;
     if let Err(error) = domains_result {
@@ -141,7 +148,7 @@ async fn get_leads_from_niche(
 
 async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient, niche: &str) {
     if !FRESH_RESULTS {
-        if let Ok(Some(_)) = lead_db::get_product_search_queries(niche, pool).await {
+        if let Ok(_) = niche_db::get_niche(pool, niche).await {
             return;
         }
     }
@@ -164,9 +171,7 @@ async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient
         .await
         .unwrap();
 
-    let search_queries: Vec<String> = products.iter().map(|p| build_seach_query(p)).collect();
-
-    _ = lead_db::insert_niche_products(products, search_queries, niche, pool).await;
+    niche_db::insert_niche(pool, niche, &prompt, products).await;
 }
 
 async fn save_urls_from_google_searche_batch(

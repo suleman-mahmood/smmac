@@ -25,7 +25,7 @@ pub async fn insert_web_page(
     .await
 }
 
-async fn filter_unscraped_product_queries(
+pub async fn filter_unscraped_product_queries(
     pool: &PgPool,
     queries: Vec<String>,
 ) -> Result<Vec<String>, sqlx::Error> {
