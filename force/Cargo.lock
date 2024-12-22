@@ -1593,6 +1593,7 @@ dependencies = [
  "actix-files",
  "actix-multipart",
  "actix-web",
+ "anyhow",
  "askama",
  "async-openai",
  "check-if-email-exists",
