@@ -93,27 +93,28 @@ pub struct EmailRow {
 }
 
 pub async fn get_email_table(pool: &PgPool) -> Result<Vec<EmailRow>, sqlx::Error> {
-    sqlx::query_as!(
-        EmailRow,
-        r#"
-        select
-            p.niche,
-            p.product,
-            f.domain,
-            f.founder_name,
-            e.email_address,
-            e.verified_status as "verified_status: EmailVerifiedStatus",
-            e.reachability as "reachability: EmailReachability"
-        from
-            email e
-            join founder f on f.id = e.founder_id
-            join domain d on d.domain = f.domain
-            join product p on p.id = d.product_id
-        order by e.created_at desc
-        "#,
-    )
-    .fetch_all(pool)
-    .await
+    todo!()
+    // sqlx::query_as!(
+    //     EmailRow,
+    //     r#"
+    //     select
+    //         p.niche,
+    //         p.product,
+    //         f.domain,
+    //         f.founder_name,
+    //         e.email_address,
+    //         e.verified_status as "verified_status: EmailVerifiedStatus",
+    //         e.reachability as "reachability: EmailReachability"
+    //     from
+    //         email e
+    //         join founder f on f.id = e.founder_id
+    //         join domain d on d.domain = f.domain
+    //         join product p on p.id = d.product_id
+    //     order by e.created_at desc
+    //     "#,
+    // )
+    // .fetch_all(pool)
+    // .await
 }
 
 pub struct VerifiedEmailRow {
@@ -126,52 +127,53 @@ pub struct VerifiedEmailRow {
 }
 
 pub async fn get_verified_emails(pool: &PgPool) -> Result<Vec<VerifiedEmailRow>, sqlx::Error> {
-    sqlx::query_as!(
-        VerifiedEmailRow,
-        r#"
-        with filtered_emails as (
-            select
-                email_address
-            from
-                email
-            where
-                verified_status = 'VERIFIED'
-
-            except
-
-            select
-                distinct unnest(array_agg(e.email_address))
-            from
-                email e
-                join founder f on f.id = e.founder_id
-                join domain d on d.domain = f.domain
-                join product p on p.id = d.product_id
-            where
-                e.verified_status = 'VERIFIED'
-            group by
-                f.domain, f.founder_name
-            having
-                count(distinct e.email_address) > 2
-        )
-        select
-            e.email_address as email,
-            (array_agg(f.founder_name))[1] as founder_name,
-            (array_agg(f.domain))[1] as domain,
-            (array_agg(p.product))[1] as product,
-            (array_agg(p.niche))[1] as niche,
-            (array_agg(e.created_at))[1] as created_at
-        from
-            filtered_emails fe
-            join email e on e.email_address = fe.email_address
-            join founder f on f.id = e.founder_id
-            join domain d on d.domain = f.domain
-            join product p on p.id = d.product_id
-        group by
-            e.email_address
-        order by
-            6 desc
-        "#
-    )
-    .fetch_all(pool)
-    .await
+    todo!()
+    // sqlx::query_as!(
+    //     VerifiedEmailRow,
+    //     r#"
+    //     with filtered_emails as (
+    //         select
+    //             email_address
+    //         from
+    //             email
+    //         where
+    //             verified_status = 'VERIFIED'
+    //
+    //         except
+    //
+    //         select
+    //             distinct unnest(array_agg(e.email_address))
+    //         from
+    //             email e
+    //             join founder f on f.id = e.founder_id
+    //             join domain d on d.domain = f.domain
+    //             join product p on p.id = d.product_id
+    //         where
+    //             e.verified_status = 'VERIFIED'
+    //         group by
+    //             f.domain, f.founder_name
+    //         having
+    //             count(distinct e.email_address) > 2
+    //     )
+    //     select
+    //         e.email_address as email,
+    //         (array_agg(f.founder_name))[1] as founder_name,
+    //         (array_agg(f.domain))[1] as domain,
+    //         (array_agg(p.product))[1] as product,
+    //         (array_agg(p.niche))[1] as niche,
+    //         (array_agg(e.created_at))[1] as created_at
+    //     from
+    //         filtered_emails fe
+    //         join email e on e.email_address = fe.email_address
+    //         join founder f on f.id = e.founder_id
+    //         join domain d on d.domain = f.domain
+    //         join product p on p.id = d.product_id
+    //     group by
+    //         e.email_address
+    //     order by
+    //         6 desc
+    //     "#
+    // )
+    // .fetch_all(pool)
+    // .await
 }

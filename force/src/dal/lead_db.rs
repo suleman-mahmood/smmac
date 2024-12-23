@@ -409,27 +409,28 @@ pub async fn get_raw_emails(
     founder_domain: FounderDomain,
     pool: &PgPool,
 ) -> Result<Option<Vec<String>>, sqlx::Error> {
-    let emails = sqlx::query_scalar!(
-        r#"
-        select
-            e.email_address
-        from
-            email e
-            join founder f on f.id = e.founder_id
-        where
-            f.domain = $1 and
-            f.founder_name = $2
-        "#,
-        founder_domain.domain,
-        founder_domain.founder_name,
-    )
-    .fetch_all(pool)
-    .await?;
-
-    match emails.is_empty() {
-        true => Ok(None),
-        false => Ok(Some(emails)),
-    }
+    todo!()
+    // let emails = sqlx::query_scalar!(
+    //     r#"
+    //     select
+    //         e.email_address
+    //     from
+    //         email e
+    //         join founder f on f.id = e.founder_id
+    //     where
+    //         f.domain = $1 and
+    //         f.founder_name = $2
+    //     "#,
+    //     founder_domain.domain,
+    //     founder_domain.founder_name,
+    // )
+    // .fetch_all(pool)
+    // .await?;
+    //
+    // match emails.is_empty() {
+    //     true => Ok(None),
+    //     false => Ok(Some(emails)),
+    // }
 }
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
@@ -451,35 +452,36 @@ impl Display for EmailVerifiedStatus {
 }
 
 pub async fn insert_emails(founder_domain_emails: Vec<FounderDomainEmail>, pool: &PgPool) {
-    for fde in founder_domain_emails {
-        let founder_id = sqlx::query_scalar!(
-            r#"
-            select id from founder where domain = $1 and founder_name = $2
-            "#,
-            fde.domain,
-            fde.founder_name,
-        )
-        .fetch_optional(pool)
-        .await;
-
-        if let Ok(Some(founder_id)) = founder_id {
-            _ = sqlx::query!(
-                r#"
-                insert into email
-                    (id, founder_id, email_address, verified_status, reachability)
-                values
-                    ($1, $2, $3, $4, $5)
-                "#,
-                Uuid::new_v4(),
-                founder_id,
-                fde.email,
-                EmailVerifiedStatus::Pending as EmailVerifiedStatus,
-                EmailReachability::Unknown as EmailReachability,
-            )
-            .execute(pool)
-            .await;
-        }
-    }
+    todo!()
+    // for fde in founder_domain_emails {
+    //     let founder_id = sqlx::query_scalar!(
+    //         r#"
+    //         select id from founder where domain = $1 and founder_name = $2
+    //         "#,
+    //         fde.domain,
+    //         fde.founder_name,
+    //     )
+    //     .fetch_optional(pool)
+    //     .await;
+    //
+    //     if let Ok(Some(founder_id)) = founder_id {
+    //         _ = sqlx::query!(
+    //             r#"
+    //             insert into email
+    //                 (id, founder_id, email_address, verified_status, reachability)
+    //             values
+    //                 ($1, $2, $3, $4, $5)
+    //             "#,
+    //             Uuid::new_v4(),
+    //             founder_id,
+    //             fde.email,
+    //             EmailVerifiedStatus::Pending as EmailVerifiedStatus,
+    //             EmailReachability::Unknown as EmailReachability,
+    //         )
+    //         .execute(pool)
+    //         .await;
+    //     }
+    // }
 }
 
 #[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
@@ -519,96 +521,100 @@ pub async fn set_email_verification_reachability(
     reachability: EmailReachability,
     con: &mut PgConnection,
 ) -> Result<PgQueryResult, sqlx::Error> {
-    sqlx::query!(
-        r#"
-        update email set
-            reachability = $2,
-            verified_status = $3
-        where
-            email_address = $1
-        "#,
-        email,
-        reachability as EmailReachability,
-        status as EmailVerifiedStatus,
-    )
-    .execute(con)
-    .await
+    todo!()
+    // sqlx::query!(
+    //     r#"
+    //     update email set
+    //         reachability = $2,
+    //         verified_status = $3
+    //     where
+    //         email_address = $1
+    //     "#,
+    //     email,
+    //     reachability as EmailReachability,
+    //     status as EmailVerifiedStatus,
+    // )
+    // .execute(con)
+    // .await
 }
 
 pub async fn get_verified_emails_for_niche(
     niche: &str,
     pool: &PgPool,
 ) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar!(
-        r#"
-        select
-            distinct e.email_address
-        from
-            email e
-            join founder f on f.id = e.founder_id
-            join domain d on d.domain = f.domain
-            join product p on p.id = d.product_id
-        where
-            p.niche = $1 and
-            e.verified_status = 'VERIFIED'
-        "#,
-        niche
-    )
-    .fetch_all(pool)
-    .await
+    todo!()
+    // sqlx::query_scalar!(
+    //     r#"
+    //     select
+    //         distinct e.email_address
+    //     from
+    //         email e
+    //         join founder f on f.id = e.founder_id
+    //         join domain d on d.domain = f.domain
+    //         join product p on p.id = d.product_id
+    //     where
+    //         p.niche = $1 and
+    //         e.verified_status = 'VERIFIED'
+    //     "#,
+    //     niche
+    // )
+    // .fetch_all(pool)
+    // .await
 }
 
 pub async fn get_catch_all_emails_for_niche(
     niche: &str,
     pool: &PgPool,
 ) -> Result<Vec<String>, sqlx::Error> {
-    let rows = sqlx::query!(
-        r#"
-        select
-            array_agg(distinct e.email_address) as email_addresses
-        from
-            email e
-            join founder f on f.id = e.founder_id
-            join domain d on d.domain = f.domain
-            join product p on p.id = d.product_id
-        where
-            p.niche = $1 and
-            e.verified_status = 'VERIFIED'
-        group by
-            f.domain, f.founder_name
-        having
-            count(distinct e.email_address) > 2
-        "#,
-        niche
-    )
-    .fetch_all(pool)
-    .await?;
-
-    let rows: Vec<Vec<String>> = rows.into_iter().filter_map(|r| r.email_addresses).collect();
-    let emails = rows.into_iter().flatten().collect();
-
-    Ok(emails)
+    todo!()
+    // let rows = sqlx::query!(
+    //     r#"
+    //     select
+    //         array_agg(distinct e.email_address) as email_addresses
+    //     from
+    //         email e
+    //         join founder f on f.id = e.founder_id
+    //         join domain d on d.domain = f.domain
+    //         join product p on p.id = d.product_id
+    //     where
+    //         p.niche = $1 and
+    //         e.verified_status = 'VERIFIED'
+    //     group by
+    //         f.domain, f.founder_name
+    //     having
+    //         count(distinct e.email_address) > 2
+    //     "#,
+    //     niche
+    // )
+    // .fetch_all(pool)
+    // .await?;
+    //
+    // let rows: Vec<Vec<String>> = rows.into_iter().filter_map(|r| r.email_addresses).collect();
+    // let emails = rows.into_iter().flatten().collect();
+    //
+    // Ok(emails)
 }
 
 pub async fn get_raw_pending_emails_for_niche(
     niche: &str,
     pool: &PgPool,
 ) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar!(
-        r#"
-        select
-            e.email_address
-        from
-            email e
-            join founder f on f.id = e.founder_id
-            join domain d on d.domain = f.domain
-            join product p on p.id = d.product_id
-        where
-            p.niche = $1 and
-            e.verified_status = 'PENDING'
-        "#,
-        niche,
-    )
-    .fetch_all(pool)
-    .await
+    todo!()
+    // sqlx::query_scalar!(
+    //     r#"
+    //     select
+    //         e.email_address
+    //     from
+    //         email e
+    //         join founder f on f.id = e.founder_id
+    //         join domain d on d.domain = f.domain
+    //         join product p on p.id = d.product_id
+    //     where
+    //         p.niche = $1 and
+    //         e.verified_status = 'PENDING'
+    //     "#,
+    //     niche,
+    // )
+    // .fetch_all(pool)
+    // .await
 }

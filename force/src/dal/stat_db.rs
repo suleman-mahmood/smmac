@@ -83,28 +83,29 @@ pub async fn get_email_stats(pool: &PgPool) -> Result<Vec<EmailStat>, sqlx::Erro
         .fetch_all(pool)
         .await?;
 
-    sqlx::query_as!(
-        EmailStat,
-        r#"
-        select
-            p.niche,
-            p.product,
-            f.domain,
-            f.founder_name,
-            e.verified_status as "verified_status: EmailVerifiedStatus",
-            count(distinct e.email_address) as unique_emails
-        from
-            email e
-            join founder f on f.id = e.founder_id
-            join domain d on d.domain = f.domain
-            join product p on p.id = d.product_id
-        where
-            p.niche = any($1)
-        group by
-            p.niche, p.product, f.domain, f.founder_name, e.verified_status
-        "#,
-        &niches,
-    )
-    .fetch_all(pool)
-    .await
+    todo!()
+    // sqlx::query_as!(
+    //     EmailStat,
+    //     r#"
+    //     select
+    //         p.niche,
+    //         p.product,
+    //         f.domain,
+    //         f.founder_name,
+    //         e.verified_status as "verified_status: EmailVerifiedStatus",
+    //         count(distinct e.email_address) as unique_emails
+    //     from
+    //         email e
+    //         join founder f on f.id = e.founder_id
+    //         join domain d on d.domain = f.domain
+    //         join product p on p.id = d.product_id
+    //     where
+    //         p.niche = any($1)
+    //     group by
+    //         p.niche, p.product, f.domain, f.founder_name, e.verified_status
+    //     "#,
+    //     &niches,
+    // )
+    // .fetch_all(pool)
+    // .await
 }

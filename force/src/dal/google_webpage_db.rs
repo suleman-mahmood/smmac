@@ -1,19 +1,19 @@
 use std::collections::HashSet;
 
-use sqlx::{postgres::PgQueryResult, PgPool};
+use sqlx::{PgConnection, PgPool};
 
 use crate::domain::google_webpage::{DataExtractionIntent, GoogleWebPage};
-
 pub async fn insert_web_page(
-    pool: &PgPool,
+    con: &mut PgConnection,
     webpage: GoogleWebPage,
-) -> Result<PgQueryResult, sqlx::Error> {
-    sqlx::query!(
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar!(
         r"
         insert into google_webpage
             (search_query, page_source, page_number, data_extraction_intent, any_result)
         values
             ($1, $2, $3, $4, $5)
+        returning id
         ",
         webpage.search_query,
         webpage.page_source,
@@ -21,7 +21,7 @@ pub async fn insert_web_page(
         webpage.data_extraction_intent as DataExtractionIntent,
         webpage.any_result,
     )
-    .execute(pool)
+    .fetch_one(&mut *con)
     .await
 }
 

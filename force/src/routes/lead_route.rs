@@ -10,9 +10,13 @@ use url::Url;
 
 use crate::{
     dal::{
-        config_db, google_webpage_db,
+        config_db, google_webpage_db, html_tag_db,
         lead_db::{self, EmailReachability, EmailVerifiedStatus},
         niche_db,
+    },
+    domain::{
+        google_webpage::{DataExtractionIntent, GoogleWebPage},
+        html_tag::HtmlTag,
     },
     services::{get_random_proxy, OpenaiClient, Sentinel},
 };
@@ -258,22 +262,22 @@ async fn save_urls_from_google_searche_batch(
 
         while let Some(res) = set.join_next().await {
             if let Ok(r) = res {
-                // Save domain entries
-                if let Err(e) =
-                    lead_db::insert_domain_candidate_urls(r.0, r.1, r.2, &r.3, r.4, con).await
-                {
-                    log::error!(
-                        "Error inserting domain candidate urls in db for url: {} and error: {:?}",
-                        r.3,
-                        e,
-                    )
-                }
-                if let Err(e) = lead_db::insert_product_page_sources(r.5, &r.3, con).await {
-                    log::error!(
-                        "Error inserting product page sources in db for url: {} and error: {:?}",
-                        r.3,
-                        e,
-                    )
+                for (page_source, page_number) in r.5 {
+                    let webpage = GoogleWebPage {
+                        search_query: r.3.clone(),
+                        page_source,
+                        data_extraction_intent: DataExtractionIntent::Domain,
+                        page_number,
+                        any_result: r.4,
+                    };
+                    let page_id = google_webpage_db::insert_web_page(con, webpage)
+                        .await
+                        .unwrap();
+
+                    for tag in r.0.clone() {
+                        let html_tag = HtmlTag::ATag(tag);
+                        _ = html_tag_db::insert_html_tag(con, html_tag, page_id).await;
+                    }
                 }
             }
         }
