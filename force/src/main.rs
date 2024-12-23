@@ -4,7 +4,7 @@ use crossbeam::channel::unbounded;
 use env_logger::Env;
 use force::{
     configuration::get_configuration,
-    services::{domain_scraper, DomainScraperSender, OpenaiClient, Sentinel},
+    services::{domain_scraper_handler, OpenaiClient, ProductQuerySender, Sentinel},
     startup::run,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -31,20 +31,20 @@ async fn main() -> std::io::Result<()> {
     let openai_client = OpenaiClient::new(configuration.api_keys.openai);
     let sentinel = Sentinel::new(configuration.api_keys.bulk_email_checker);
 
-    let (domain_scraper_sender, domain_scraper_receiver) = unbounded::<String>();
-    let domain_scraper_sender = DomainScraperSender {
-        sender: domain_scraper_sender,
+    let (product_query_sender, product_query_receiver) = unbounded::<String>();
+    let product_query_sender = ProductQuerySender {
+        sender: product_query_sender,
     };
 
     // Spawn tasks
-    tokio::spawn(domain_scraper(domain_scraper_receiver));
+    tokio::spawn(domain_scraper_handler(product_query_receiver));
 
     run(
         listener,
         connection_pool,
         openai_client,
         sentinel,
-        domain_scraper_sender,
+        product_query_sender,
     )?
     .await
 }

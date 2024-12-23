@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use actix_web::{get, web, HttpResponse};
 use check_if_email_exists::Reachable;
-use crossbeam::channel::Sender;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sqlx::{Acquire, PgPool};
@@ -19,7 +18,7 @@ use crate::{
         google_webpage::{DataExtractionIntent, GoogleWebPage},
         html_tag::HtmlTag,
     },
-    services::{get_random_proxy, DomainScraperSender, OpenaiClient, Sentinel},
+    services::{get_random_proxy, OpenaiClient, ProductQuerySender, Sentinel},
 };
 
 const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
@@ -46,7 +45,7 @@ async fn get_leads_from_niche(
     body: web::Query<GetLeadsFromNicheQuery>,
     pool: web::Data<PgPool>,
     sentinel: web::Data<Sentinel>,
-    domain_scraper_sender: web::Data<DomainScraperSender>,
+    product_query_sender: web::Data<ProductQuerySender>,
 ) -> HttpResponse {
     /*
     1. (v2) User verification and free tier count
@@ -72,10 +71,10 @@ async fn get_leads_from_niche(
         .await
         .unwrap();
 
-    let domain_scraper_sender = domain_scraper_sender.sender.clone();
+    let product_query_sender = product_query_sender.sender.clone();
     product_queries
         .iter()
-        .for_each(|q| domain_scraper_sender.send(q.to_string()).unwrap());
+        .for_each(|q| product_query_sender.send(q.to_string()).unwrap());
 
     let page_depth = config_db::get_google_search_page_depth(&pool)
         .await
@@ -291,12 +290,12 @@ async fn save_urls_from_google_searche_batch(
     }
 }
 
-enum GoogleSearchType {
+pub enum GoogleSearchType {
     Domain(Option<String>),
     Founder(String),
 }
 
-enum GoogleSearchResult {
+pub enum GoogleSearchResult {
     NotFound,
     Domains {
         domain_urls: Vec<String>,
@@ -312,7 +311,7 @@ struct GoogleQuery {
     q: String,
 }
 
-async fn extract_data_from_google_search_with_reqwest(
+pub async fn extract_data_from_google_search_with_reqwest(
     query: String,
     search_type: GoogleSearchType,
 ) -> GoogleSearchResult {

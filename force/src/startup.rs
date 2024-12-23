@@ -14,7 +14,7 @@ use crate::{
         dashboard_route, default_route, domain_route, email_route, exp_route, founder_route,
         lead_route, login_route, product_route, verified_email_route,
     },
-    services::{DomainScraperSender, OpenaiClient, Sentinel},
+    services::{OpenaiClient, ProductQuerySender, Sentinel},
 };
 
 pub fn run(
@@ -22,12 +22,12 @@ pub fn run(
     db_pool: PgPool,
     openai_client: OpenaiClient,
     sentinel: Sentinel,
-    domain_scraper_sender: DomainScraperSender,
+    product_query_sender: ProductQuerySender,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let openai_client = web::Data::new(openai_client);
     let sentinel = web::Data::new(sentinel);
-    let domain_scraper_sender = web::Data::new(domain_scraper_sender);
+    let product_query_sender = web::Data::new(product_query_sender);
 
     let server = HttpServer::new(move || {
         App::new()
@@ -68,7 +68,7 @@ pub fn run(
             .app_data(db_pool.clone())
             .app_data(openai_client.clone())
             .app_data(sentinel.clone())
-            .app_data(domain_scraper_sender.clone())
+            .app_data(product_query_sender.clone())
     })
     .listen(listener)?
     .run();
