@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use actix_web::{get, web, HttpResponse};
 use check_if_email_exists::Reachable;
+use crossbeam::channel::Sender;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sqlx::{Acquire, PgPool};
@@ -18,7 +19,7 @@ use crate::{
         google_webpage::{DataExtractionIntent, GoogleWebPage},
         html_tag::HtmlTag,
     },
-    services::{get_random_proxy, OpenaiClient, Sentinel},
+    services::{get_random_proxy, DomainScraperSender, OpenaiClient, Sentinel},
 };
 
 const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
@@ -45,6 +46,7 @@ async fn get_leads_from_niche(
     body: web::Query<GetLeadsFromNicheQuery>,
     pool: web::Data<PgPool>,
     sentinel: web::Data<Sentinel>,
+    domain_scraper_sender: web::Data<DomainScraperSender>,
 ) -> HttpResponse {
     /*
     1. (v2) User verification and free tier count
@@ -69,6 +71,11 @@ async fn get_leads_from_niche(
     let product_queries = google_webpage_db::filter_unscraped_product_queries(&pool, queries)
         .await
         .unwrap();
+
+    let domain_scraper_sender = domain_scraper_sender.sender.clone();
+    product_queries
+        .iter()
+        .for_each(|q| domain_scraper_sender.send(q.to_string()).unwrap());
 
     let page_depth = config_db::get_google_search_page_depth(&pool)
         .await
@@ -175,7 +182,7 @@ async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient
         .await
         .unwrap();
 
-    niche_db::insert_niche(pool, niche, &prompt, products).await;
+    _ = niche_db::insert_niche(pool, niche, &prompt, products).await;
 }
 
 async fn save_urls_from_google_searche_batch(
