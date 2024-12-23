@@ -4,10 +4,9 @@ use crossbeam::channel::{Receiver, Sender};
 
 const PAGE_DEPTH: u8 = 10;
 
-use crate::routes::lead_route::{
-    build_founder_seach_query, extract_data_from_google_search_with_reqwest, get_domain_from_url,
-    GoogleSearchResult, GoogleSearchType,
-};
+use crate::routes::lead_route::{build_founder_seach_query, get_domain_from_url};
+
+use super::{extract_data_from_google_search_with_reqwest, GoogleSearchResult, GoogleSearchType};
 
 pub struct ProductQuerySender {
     pub sender: Sender<String>,
