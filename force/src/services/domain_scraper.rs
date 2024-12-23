@@ -7,10 +7,11 @@ pub struct DomainScraperSender {
 }
 
 pub async fn domain_scraper(receiver: Receiver<String>) {
+    log::info!("Started domain scraper");
     loop {
         match receiver.recv() {
             Ok(query) => {
-                todo!();
+                log::info!("Got query: {:?}", query);
             }
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
         }

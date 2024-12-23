@@ -37,7 +37,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     // Spawn tasks
-    tokio::spawn(async { domain_scraper(domain_scraper_receiver) });
+    tokio::spawn(domain_scraper(domain_scraper_receiver));
 
     run(
         listener,
