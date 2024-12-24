@@ -6,8 +6,9 @@ use env_logger::Env;
 use force::{
     configuration::get_configuration,
     services::{
-        domain_scraper_handler, email_verified_handler, founder_scraper_handler,
-        FounderQueryChannelData, OpenaiClient, ProductQuerySender, Sentinel,
+        data_persistance_handler, domain_scraper_handler, email_verified_handler,
+        founder_scraper_handler, FounderQueryChannelData, OpenaiClient, PersistantData,
+        ProductQuerySender, Sentinel,
     },
     startup::run,
 };
@@ -39,6 +40,7 @@ async fn main() -> std::io::Result<()> {
     let (product_query_sender, product_query_receiver) = unbounded::<String>();
     let (founder_query_sender, founder_query_receiver) = unbounded::<FounderQueryChannelData>();
     let (email_sender, email_receiver) = unbounded::<String>();
+    let (persistant_data_sender, persistant_data_receiver) = unbounded::<PersistantData>();
 
     let product_query_sender = ProductQuerySender {
         sender: product_query_sender,
@@ -54,6 +56,7 @@ async fn main() -> std::io::Result<()> {
         email_sender,
     ));
     tokio::spawn(email_verified_handler(sentinel.clone(), email_receiver));
+    tokio::spawn(data_persistance_handler(persistant_data_receiver));
 
     run(
         listener,

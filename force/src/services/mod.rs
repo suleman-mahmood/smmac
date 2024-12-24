@@ -1,3 +1,4 @@
+pub mod data_persistance;
 pub mod domain_scraper;
 pub mod droid;
 pub mod email_verifier;
@@ -6,6 +7,7 @@ pub mod google_scraper;
 pub mod openai_client;
 pub mod sentinel;
 
+pub use data_persistance::*;
 pub use domain_scraper::*;
 pub use droid::*;
 pub use email_verifier::*;
