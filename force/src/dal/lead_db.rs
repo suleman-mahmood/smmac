@@ -5,8 +5,9 @@ use serde::Deserialize;
 use sqlx::{postgres::PgQueryResult, PgConnection, PgPool};
 use uuid::Uuid;
 
-use crate::routes::lead_route::{
-    FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate, FRESH_RESULTS,
+use crate::{
+    routes::lead_route::{FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate},
+    services::FRESH_RESULTS,
 };
 
 pub async fn get_product_search_queries(

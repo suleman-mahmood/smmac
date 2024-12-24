@@ -16,12 +16,11 @@ use crate::{
         html_tag::HtmlTag,
     },
     services::{
-        extract_data_from_google_search_with_reqwest, GoogleSearchResult, GoogleSearchType,
-        OpenaiClient, ProductQuerySender, Sentinel,
+        extract_data_from_google_search_with_reqwest, save_product_search_queries,
+        GoogleSearchResult, GoogleSearchType, OpenaiClient, ProductQuerySender, Sentinel,
     },
 };
 
-pub const FRESH_RESULTS: bool = true; // Default to false
 const BLACK_LIST_DOMAINS: [&str; 7] = [
     "reddit",
     "youtube",
@@ -153,34 +152,6 @@ async fn get_leads_from_niche(
             HttpResponse::Ok().body("Done!")
         }
     }
-}
-
-pub async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient, niche: &str) {
-    if !FRESH_RESULTS {
-        if let Ok(_) = niche_db::get_niche(pool, niche).await {
-            return;
-        }
-    }
-
-    let (left_prompt, right_prompt) = config_db::get_gippity_prompt(pool).await.unwrap();
-    let prompt = format!(
-        "{} {} {}",
-        left_prompt.unwrap_or("Give different names for the following product:".to_string()),
-        niche,
-        right_prompt.unwrap_or(r#"
-            For example for product "yoga mat" similar products will be like: yoga block, silk yoga mat, yellow yoga mat, yoga mat bag, workout mat.
-            Only return 10 product names in a list but don't start with a bullet point.
-            Do not give numbers to products.
-            Give each product on a new line.
-        "#.to_string())
-    );
-
-    let products = openai_client
-        .get_boolean_searches_from_niche(&prompt)
-        .await
-        .unwrap();
-
-    _ = niche_db::insert_niche(pool, niche, &prompt, products).await;
 }
 
 async fn save_urls_from_google_searche_batch(
