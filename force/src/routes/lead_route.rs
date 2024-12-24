@@ -301,7 +301,7 @@ pub struct FounderTagCandidate {
     pub domain: String,
 }
 
-enum FounderThreadResult {
+pub enum FounderThreadResult {
     Insert(FounderTagCandidate, Vec<Option<String>>, String, String),
     NotFounder(String),
     Ignore,

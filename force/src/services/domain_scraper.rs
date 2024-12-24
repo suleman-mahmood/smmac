@@ -6,25 +6,31 @@ const PAGE_DEPTH: u8 = 10;
 
 use crate::routes::lead_route::{build_founder_seach_query, get_domain_from_url};
 
-use super::{extract_data_from_google_search_with_reqwest, GoogleSearchResult, GoogleSearchType};
+use super::{
+    extract_data_from_google_search_with_reqwest, FounderQueryChannelData, GoogleSearchResult,
+    GoogleSearchType,
+};
 
 pub struct ProductQuerySender {
     pub sender: Sender<String>,
 }
 
-pub async fn domain_scraper_handler(product_query_receiver: Receiver<String>) {
+pub async fn domain_scraper_handler(
+    product_query_receiver: Receiver<String>,
+    founder_query_sender: Sender<FounderQueryChannelData>,
+) {
     log::info!("Started domain scraper");
     loop {
         match product_query_receiver.recv() {
             Ok(query) => {
-                tokio::spawn(scrape_domain_query(query));
+                tokio::spawn(scrape_domain_query(query, founder_query_sender.clone()));
             }
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
         }
     }
 }
 
-async fn scrape_domain_query(query: String) {
+async fn scrape_domain_query(query: String, founder_query_sender: Sender<FounderQueryChannelData>) {
     // Fetch domain urls for url, if exist don't search
 
     let mut current_url = None;
@@ -53,6 +59,15 @@ async fn scrape_domain_query(query: String) {
                 next_page_url,
                 page_source,
             } => {
+                for domain_url in domain_urls_list.iter() {
+                    if let Some(domain) = get_domain_from_url(domain_url) {
+                        let query = build_founder_seach_query(&domain);
+                        founder_query_sender
+                            .send(FounderQueryChannelData { query, domain })
+                            .unwrap();
+                    }
+                }
+
                 domain_urls_list.extend(domain_urls);
                 page_source_list.push((page_source, current_page_index + 1));
                 match next_page_url {
