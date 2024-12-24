@@ -155,7 +155,7 @@ async fn get_leads_from_niche(
     }
 }
 
-async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient, niche: &str) {
+pub async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient, niche: &str) {
     if !FRESH_RESULTS {
         if let Ok(_) = niche_db::get_niche(pool, niche).await {
             return;

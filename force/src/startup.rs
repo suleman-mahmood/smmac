@@ -34,6 +34,7 @@ pub fn run(
             .service(Files::new("/static", "./templates/static").prefer_utf8(true))
             .service(default_route::default)
             .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
+            .service(web::scope("/lightning").service(lead_route::get_leads_from_niche))
             .service(web::scope("/exp").service(exp_route::check_channel_works))
             // .service(
             //     web::scope("/exp")
