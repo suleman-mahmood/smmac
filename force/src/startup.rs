@@ -4,7 +4,7 @@ use actix_files::Files;
 use actix_web::{
     dev::Server,
     middleware::Logger,
-    web::{self},
+    web::{self, Data},
     App, HttpServer,
 };
 use sqlx::PgPool;
@@ -21,12 +21,11 @@ pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
     openai_client: OpenaiClient,
-    sentinel: Sentinel,
+    sentinel: Data<Sentinel>,
     product_query_sender: ProductQuerySender,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let openai_client = web::Data::new(openai_client);
-    let sentinel = web::Data::new(sentinel);
     let product_query_sender = web::Data::new(product_query_sender);
 
     let server = HttpServer::new(move || {

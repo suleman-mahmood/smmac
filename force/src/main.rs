@@ -1,12 +1,13 @@
-use std::{net::TcpListener, time::Duration};
+use std::{borrow::Borrow, net::TcpListener, time::Duration};
 
+use actix_web::web;
 use crossbeam::channel::unbounded;
 use env_logger::Env;
 use force::{
     configuration::get_configuration,
     services::{
-        domain_scraper_handler, founder_scraper_handler, FounderQueryChannelData, OpenaiClient,
-        ProductQuerySender, Sentinel,
+        domain_scraper_handler, email_verified_handler, founder_scraper_handler,
+        FounderQueryChannelData, OpenaiClient, ProductQuerySender, Sentinel,
     },
     startup::run,
 };
@@ -33,9 +34,11 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
     let openai_client = OpenaiClient::new(configuration.api_keys.openai);
     let sentinel = Sentinel::new(configuration.api_keys.bulk_email_checker);
+    let sentinel = web::Data::new(sentinel);
 
     let (product_query_sender, product_query_receiver) = unbounded::<String>();
     let (founder_query_sender, founder_query_receiver) = unbounded::<FounderQueryChannelData>();
+    let (email_sender, email_receiver) = unbounded::<String>();
 
     let product_query_sender = ProductQuerySender {
         sender: product_query_sender,
@@ -46,7 +49,11 @@ async fn main() -> std::io::Result<()> {
         product_query_receiver,
         founder_query_sender,
     ));
-    tokio::spawn(founder_scraper_handler(founder_query_receiver));
+    tokio::spawn(founder_scraper_handler(
+        founder_query_receiver,
+        email_sender,
+    ));
+    tokio::spawn(email_verified_handler(sentinel.clone(), email_receiver));
 
     run(
         listener,

@@ -1,8 +1,10 @@
 use std::{collections::HashSet, time::Duration};
 
-use crossbeam::channel::Receiver;
+use crossbeam::channel::{Receiver, Sender};
 
-use crate::routes::lead_route::{extract_founder_names, FounderThreadResult};
+use crate::routes::lead_route::{
+    extract_founder_names, get_email_permutations, FounderDomainEmail, FounderThreadResult,
+};
 
 use super::{extract_data_from_google_search_with_reqwest, GoogleSearchResult, GoogleSearchType};
 
@@ -13,7 +15,10 @@ pub struct FounderQueryChannelData {
     pub domain: String,
 }
 
-pub async fn founder_scraper_handler(founder_query_receiver: Receiver<FounderQueryChannelData>) {
+pub async fn founder_scraper_handler(
+    founder_query_receiver: Receiver<FounderQueryChannelData>,
+    email_sender: Sender<String>,
+) {
     log::info!("Started founder scraper");
     let mut seen_queries = HashSet::new();
 
@@ -27,7 +32,7 @@ pub async fn founder_scraper_handler(founder_query_receiver: Receiver<FounderQue
                         seen_queries.clear();
                     }
                     seen_queries.insert(data.query.clone());
-                    tokio::spawn(scrape_founder_query(data));
+                    tokio::spawn(scrape_founder_query(data, email_sender.clone()));
                 }
             },
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
@@ -35,7 +40,7 @@ pub async fn founder_scraper_handler(founder_query_receiver: Receiver<FounderQue
     }
 }
 
-async fn scrape_founder_query(data: FounderQueryChannelData) {
+async fn scrape_founder_query(data: FounderQueryChannelData, email_sender: Sender<String>) {
     let google_search_result = extract_data_from_google_search_with_reqwest(
         data.query.clone(),
         GoogleSearchType::Founder(data.domain.clone()),
@@ -50,6 +55,17 @@ async fn scrape_founder_query(data: FounderQueryChannelData) {
         }
         GoogleSearchResult::Founders(tag_candidate, page_source) => {
             let founder_names = extract_founder_names(tag_candidate.clone());
+
+            let emails: Vec<FounderDomainEmail> = founder_names
+                .clone()
+                .into_iter()
+                .filter_map(|name| name.map(|name| get_email_permutations(&name, &data.domain)))
+                .flatten()
+                .collect();
+
+            for em in emails {
+                email_sender.send(em.email).unwrap();
+            }
 
             FounderThreadResult::Insert(tag_candidate, founder_names, data.domain, page_source)
         }

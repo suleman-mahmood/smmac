@@ -540,7 +540,7 @@ pub async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Vec<String
     vec![]
 }
 
-fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
+pub fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
     let mut emails_db: Vec<FounderDomainEmail> = vec![];
 
     let name_pieces: Vec<&str> = name.split(" ").collect();
