@@ -2,7 +2,7 @@ use std::{collections::HashSet, time::Duration};
 
 use crossbeam::channel::{Receiver, Sender};
 
-const PAGE_DEPTH: u8 = 10;
+const PAGE_DEPTH: u8 = 1;
 const SET_RESET_LEN: usize = 10_000;
 
 use crate::routes::lead_route::{
