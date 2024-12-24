@@ -36,5 +36,7 @@ async fn get_lightning_leads(
         .iter()
         .for_each(|q| product_query_sender.send(q.to_string()).unwrap());
 
-    HttpResponse::Ok().body("Registered domain!")
+    // TODO: Get the desired number of emails from db and then return
+
+    HttpResponse::Ok().body("Running for niche!")
 }
