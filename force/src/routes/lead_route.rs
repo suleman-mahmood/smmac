@@ -21,7 +21,7 @@ use crate::{
     },
 };
 
-const BLACK_LIST_DOMAINS: [&str; 7] = [
+pub const BLACK_LIST_DOMAINS: [&str; 7] = [
     "reddit",
     "youtube",
     "pinterest",

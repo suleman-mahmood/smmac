@@ -5,7 +5,9 @@ use crossbeam::channel::{Receiver, Sender};
 const PAGE_DEPTH: u8 = 10;
 const SET_RESET_LEN: usize = 10_000;
 
-use crate::routes::lead_route::{build_founder_seach_query, get_domain_from_url};
+use crate::routes::lead_route::{
+    build_founder_seach_query, get_domain_from_url, BLACK_LIST_DOMAINS,
+};
 
 use super::{
     extract_data_from_google_search_with_reqwest, FounderQueryChannelData, GoogleSearchResult,
@@ -73,10 +75,16 @@ async fn scrape_domain_query(query: String, founder_query_sender: Sender<Founder
             } => {
                 for domain_url in domain_urls_list.iter() {
                     if let Some(domain) = get_domain_from_url(domain_url) {
-                        let query = build_founder_seach_query(&domain);
-                        founder_query_sender
-                            .send(FounderQueryChannelData { query, domain })
-                            .unwrap();
+                        // Remove blacklisted domains
+                        if BLACK_LIST_DOMAINS
+                            .iter()
+                            .any(|&blacklist| domain.contains(blacklist))
+                        {
+                            let query = build_founder_seach_query(&domain);
+                            founder_query_sender
+                                .send(FounderQueryChannelData { query, domain })
+                                .unwrap();
+                        }
                     }
                 }
 
