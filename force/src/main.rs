@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, net::TcpListener, time::Duration};
+use std::{net::TcpListener, time::Duration};
 
 use actix_web::web;
 use crossbeam::channel::unbounded;
@@ -50,6 +50,7 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(domain_scraper_handler(
         product_query_receiver,
         founder_query_sender,
+        persistant_data_sender,
     ));
     tokio::spawn(founder_scraper_handler(
         founder_query_receiver,
