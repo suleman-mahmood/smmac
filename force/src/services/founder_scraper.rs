@@ -1,10 +1,12 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use crossbeam::channel::Receiver;
 
 use crate::routes::lead_route::{extract_founder_names, FounderThreadResult};
 
 use super::{extract_data_from_google_search_with_reqwest, GoogleSearchResult, GoogleSearchType};
+
+const SET_RESET_LEN: usize = 10_000;
 
 pub struct FounderQueryChannelData {
     pub query: String,
@@ -13,12 +15,21 @@ pub struct FounderQueryChannelData {
 
 pub async fn founder_scraper_handler(founder_query_receiver: Receiver<FounderQueryChannelData>) {
     log::info!("Started founder scraper");
+    let mut seen_queries = HashSet::new();
+
     loop {
-        // TODO: Add seen set here to avoid scraping duplicate queries
         match founder_query_receiver.recv() {
-            Ok(data) => {
-                tokio::spawn(scrape_founder_query(data));
-            }
+            Ok(data) => match seen_queries.contains(&data.query) {
+                true => {}
+                false => {
+                    // TODO: Implement time based reset like 10 mins after channel was empty
+                    if seen_queries.len() > SET_RESET_LEN {
+                        seen_queries.clear();
+                    }
+                    seen_queries.insert(data.query.clone());
+                    tokio::spawn(scrape_founder_query(data));
+                }
+            },
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
         }
     }

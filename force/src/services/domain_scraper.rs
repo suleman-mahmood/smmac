@@ -1,8 +1,9 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use crossbeam::channel::{Receiver, Sender};
 
 const PAGE_DEPTH: u8 = 10;
+const SET_RESET_LEN: usize = 10_000;
 
 use crate::routes::lead_route::{build_founder_seach_query, get_domain_from_url};
 
@@ -20,11 +21,22 @@ pub async fn domain_scraper_handler(
     founder_query_sender: Sender<FounderQueryChannelData>,
 ) {
     log::info!("Started domain scraper");
+    let mut seen_queries = HashSet::new();
+
     loop {
         match product_query_receiver.recv() {
-            Ok(query) => {
-                tokio::spawn(scrape_domain_query(query, founder_query_sender.clone()));
-            }
+            Ok(query) => match seen_queries.contains(&query) {
+                true => {}
+                false => {
+                    // TODO: Implement time based reset like 10 mins after channel was empty
+                    if seen_queries.len() > SET_RESET_LEN {
+                        seen_queries.clear();
+                    }
+                    seen_queries.insert(query.clone());
+                    tokio::spawn(scrape_domain_query(query, founder_query_sender.clone()));
+                }
+            },
+
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
         }
     }
