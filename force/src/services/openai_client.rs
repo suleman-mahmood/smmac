@@ -65,10 +65,14 @@ impl OpenaiClient {
     }
 }
 
-pub async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiClient, niche: &str) {
+pub async fn save_product_search_queries(
+    pool: &PgPool,
+    openai_client: &OpenaiClient,
+    niche: &str,
+) -> Vec<String> {
     if !FRESH_RESULTS {
-        if let Ok(_) = niche_db::get_niche(pool, niche).await {
-            return;
+        if let Ok(products) = niche_db::get_niche(pool, niche).await {
+            return products.generated_products;
         }
     }
 
@@ -90,5 +94,12 @@ pub async fn save_product_search_queries(pool: &PgPool, openai_client: &OpenaiCl
         .await
         .unwrap();
 
-    _ = niche_db::insert_niche(pool, niche, &prompt, products).await;
+    let products: Vec<String> = products
+        .into_iter()
+        .map(|p| p.trim().to_lowercase())
+        .collect();
+
+    _ = niche_db::insert_niche(pool, niche, &prompt, products.clone()).await;
+
+    products
 }

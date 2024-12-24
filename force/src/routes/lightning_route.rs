@@ -4,8 +4,8 @@ use sqlx::PgPool;
 
 use crate::dal::google_webpage_db;
 use crate::routes::lead_route;
+use crate::services::OpenaiClient;
 use crate::services::{save_product_search_queries, ProductQuerySender};
-use crate::{dal::niche_db, services::OpenaiClient};
 
 #[derive(Deserialize)]
 struct GetLightningLeadsQuery {
@@ -21,11 +21,9 @@ async fn get_lightning_leads(
 ) -> HttpResponse {
     let niche = query.niche.trim().to_lowercase();
 
-    save_product_search_queries(&pool, &openai_client, &niche).await;
+    let products = save_product_search_queries(&pool, &openai_client, &niche).await;
 
-    let niche_obj = niche_db::get_niche(&pool, &niche).await.unwrap();
-    let queries: Vec<String> = niche_obj
-        .generated_products
+    let queries: Vec<String> = products
         .into_iter()
         .map(|p| lead_route::build_seach_query(&p))
         .collect();
