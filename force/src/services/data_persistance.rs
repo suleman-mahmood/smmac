@@ -6,6 +6,7 @@ use crate::domain::html_tag::HtmlTag;
 
 pub enum PersistantData {
     Domain(DomainData),
+    Founder(FounderData),
 }
 
 pub enum DomainData {
@@ -18,11 +19,31 @@ pub enum DomainData {
     },
 }
 
+// TODO: Combine page data for domain and founder
 pub struct DomainPageData {
     pub page_source: String,
     pub page_number: u8,
     pub html_tags: Vec<HtmlTag>,
     pub domains: Vec<Option<String>>,
+}
+
+pub enum FounderData {
+    Result {
+        query: String,
+        domain: String,
+        page_data: FounderPageData,
+    },
+    NoResult {
+        query: String,
+        domain: String,
+    },
+}
+
+pub struct FounderPageData {
+    pub page_source: String,
+    pub page_number: u8,
+    pub html_tags: Vec<HtmlTag>,
+    pub founder_names: Vec<Option<String>>,
 }
 
 pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>) {

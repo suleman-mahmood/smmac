@@ -50,11 +50,12 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(domain_scraper_handler(
         product_query_receiver,
         founder_query_sender,
-        persistant_data_sender,
+        persistant_data_sender.clone(),
     ));
     tokio::spawn(founder_scraper_handler(
         founder_query_receiver,
         email_sender,
+        persistant_data_sender,
     ));
     tokio::spawn(email_verified_handler(sentinel.clone(), email_receiver));
     tokio::spawn(data_persistance_handler(persistant_data_receiver));
