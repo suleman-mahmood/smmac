@@ -436,21 +436,6 @@ async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec
     }
 }
 
-pub async fn filter_verified_emails(
-    sentinel: web::Data<Sentinel>,
-    emails: Vec<String>,
-) -> Vec<String> {
-    let mut verified_emails: Vec<String> = vec![];
-
-    for em in emails {
-        if sentinel.verfiy_email(em.clone()).await {
-            verified_emails.push(em);
-        }
-    }
-
-    verified_emails
-}
-
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
