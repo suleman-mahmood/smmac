@@ -6,8 +6,8 @@ use sqlx::{postgres::PgQueryResult, PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::{
-    domain::html_tag::HtmlTag,
-    routes::lead_route::{FounderDomain, FounderDomainEmail, FounderTagCandidate},
+    domain::{email::FounderDomainEmail, html_tag::HtmlTag},
+    routes::lead_route::{FounderDomain, FounderTagCandidate},
     services::FRESH_RESULTS,
 };
 

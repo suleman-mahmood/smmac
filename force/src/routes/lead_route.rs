@@ -11,6 +11,7 @@ use crate::{
         niche_db,
     },
     domain::{
+        email::construct_email_permutations,
         google_webpage::{DataExtractionIntent, GoogleWebPage},
         html_tag::{extract_domain, extract_founder_name, HtmlTag},
     },
@@ -374,13 +375,6 @@ pub struct FounderDomain {
     pub domain: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct FounderDomainEmail {
-    pub founder_name: String,
-    pub domain: String,
-    pub email: String,
-}
-
 pub async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Vec<String> {
     if let Ok(Some(founder_domains)) = lead_db::get_founder_domains(domains, pool).await {
         let mut all_emails: Vec<String> = vec![];
@@ -392,7 +386,7 @@ pub async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Vec<String
                 continue;
             }
 
-            let emails_db = get_email_permutations(&fd.founder_name, &fd.domain);
+            let emails_db = construct_email_permutations(&fd.founder_name, &fd.domain);
             if emails_db.is_empty() {
                 continue;
             }
@@ -406,60 +400,6 @@ pub async fn construct_emails(pool: &PgPool, domains: Vec<String>) -> Vec<String
         return all_emails;
     }
     vec![]
-}
-
-pub fn get_email_permutations(name: &str, domain: &str) -> Vec<FounderDomainEmail> {
-    let mut emails_db: Vec<FounderDomainEmail> = vec![];
-
-    let name_pieces: Vec<&str> = name.split(" ").collect();
-    if name_pieces.len() == 2 {
-        let name_vec: Vec<&str> = name.split(" ").collect();
-        let first_name = name_vec.first().unwrap().to_lowercase();
-        let last_name = name_vec.get(1).unwrap().to_lowercase();
-
-        emails_db.push(FounderDomainEmail {
-            email: format!("{}@{}", first_name, domain),
-            founder_name: name.to_string(),
-            domain: domain.to_string(),
-        });
-        emails_db.push(FounderDomainEmail {
-            email: format!("{}@{}", last_name, domain),
-            founder_name: name.to_string(),
-            domain: domain.to_string(),
-        });
-        emails_db.push(FounderDomainEmail {
-            email: format!("{}{}@{}", first_name, last_name, domain),
-            founder_name: name.to_string(),
-            domain: domain.to_string(),
-        });
-        emails_db.push(FounderDomainEmail {
-            email: format!("{}.{}@{}", first_name, last_name, domain),
-            founder_name: name.to_string(),
-            domain: domain.to_string(),
-        });
-        emails_db.push(FounderDomainEmail {
-            email: format!(
-                "{}{}@{}",
-                first_name,
-                last_name.chars().next().unwrap(),
-                domain
-            ),
-            founder_name: name.to_string(),
-            domain: domain.to_string(),
-        });
-        emails_db.push(FounderDomainEmail {
-            email: format!(
-                "{}{}@{}",
-                first_name.chars().next().unwrap(),
-                last_name,
-                domain
-            ),
-            founder_name: name.to_string(),
-            domain: domain.to_string(),
-        });
-    }
-
-    emails_db
 }
 
 async fn verify_emails(pool: &PgPool, sentinel: web::Data<Sentinel>, emails: Vec<String>) {
@@ -516,8 +456,11 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{
-        domain::html_tag::{extract_domain, HtmlTag},
-        routes::lead_route::{extract_founder_name, get_email_permutations, FounderTagCandidate},
+        domain::{
+            email::construct_email_permutations,
+            html_tag::{extract_domain, HtmlTag},
+        },
+        routes::lead_route::{extract_founder_name, FounderTagCandidate},
     };
 
     #[test]
@@ -764,7 +707,7 @@ mod tests {
 
         let mut results: Vec<String> = vec![];
         for name in names {
-            let emails = get_email_permutations(&name, "verywellfit.com");
+            let emails = construct_email_permutations(&name, "verywellfit.com");
             results.extend(emails.into_iter().map(|e| e.email));
         }
 

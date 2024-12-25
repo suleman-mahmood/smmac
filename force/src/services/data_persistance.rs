@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crossbeam::channel::Receiver;
 
-use crate::{domain::html_tag::HtmlTag, routes::lead_route::FounderDomainEmail};
+use crate::domain::{email::FounderDomainEmail, html_tag::HtmlTag};
 
 pub enum PersistantData {
     Domain(DomainData),

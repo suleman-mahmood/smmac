@@ -3,8 +3,11 @@ use std::{collections::HashSet, time::Duration};
 use crossbeam::channel::{Receiver, Sender};
 
 use crate::{
-    domain::html_tag::extract_founder_name,
-    routes::lead_route::{get_email_permutations, FounderDomainEmail, FounderThreadResult},
+    domain::{
+        email::{construct_email_permutations, FounderDomainEmail},
+        html_tag::extract_founder_name,
+    },
+    routes::lead_route::FounderThreadResult,
 };
 
 use super::{
@@ -84,7 +87,9 @@ async fn scrape_founder_query(
             let emails: Vec<FounderDomainEmail> = founder_names
                 .clone()
                 .into_iter()
-                .filter_map(|name| name.map(|name| get_email_permutations(&name, &data.domain)))
+                .filter_map(|name| {
+                    name.map(|name| construct_email_permutations(&name, &data.domain))
+                })
                 .flatten()
                 .collect();
 
