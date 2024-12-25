@@ -4,8 +4,7 @@ use scraper::{Html, Selector};
 use serde::Serialize;
 
 use crate::{
-    routes::lead_route::{FounderElement, FounderTagCandidate},
-    services::get_random_proxy,
+    domain::html_tag::HtmlTag, routes::lead_route::FounderTagCandidate, services::get_random_proxy,
 };
 
 const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
@@ -125,7 +124,7 @@ pub async fn extract_data_from_google_search_with_reqwest(
                         GoogleSearchType::Founder(ref domain) => {
                             log::info!("Found {} h3_tags| Potential founder names", headings.len(),);
 
-                            let elements = headings.into_iter().map(FounderElement::H3).collect();
+                            let elements = headings.into_iter().map(HtmlTag::H3Tag).collect();
 
                             return GoogleSearchResult::Founders(
                                 FounderTagCandidate {

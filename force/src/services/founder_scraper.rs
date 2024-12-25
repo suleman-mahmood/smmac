@@ -3,11 +3,8 @@ use std::{collections::HashSet, time::Duration};
 use crossbeam::channel::{Receiver, Sender};
 
 use crate::{
-    domain::html_tag::HtmlTag,
-    routes::lead_route::{
-        extract_founder_names, get_email_permutations, FounderDomainEmail, FounderElement,
-        FounderThreadResult,
-    },
+    domain::html_tag::extract_founder_name,
+    routes::lead_route::{get_email_permutations, FounderDomainEmail, FounderThreadResult},
 };
 
 use super::{
@@ -78,7 +75,11 @@ async fn scrape_founder_query(
             FounderThreadResult::Ignore
         }
         GoogleSearchResult::Founders(tag_candidate, page_source) => {
-            let founder_names = extract_founder_names(tag_candidate.clone());
+            let founder_names: Vec<Option<String>> = tag_candidate
+                .elements
+                .iter()
+                .map(|ele| extract_founder_name(ele.clone()))
+                .collect();
 
             let emails: Vec<FounderDomainEmail> = founder_names
                 .clone()
@@ -96,15 +97,7 @@ async fn scrape_founder_query(
             let page_data = FounderPageData {
                 page_source: page_source.clone(),
                 page_number: 1,
-                html_tags: tag_candidate
-                    .elements
-                    .clone()
-                    .into_iter()
-                    .map(|ele| match ele {
-                        FounderElement::Span(content) => HtmlTag::SpanTag(content),
-                        FounderElement::H3(content) => HtmlTag::H3Tag(content),
-                    })
-                    .collect(),
+                html_tags: tag_candidate.elements.clone(),
                 founder_names: founder_names.clone(),
             };
 

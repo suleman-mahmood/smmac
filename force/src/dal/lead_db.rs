@@ -6,7 +6,8 @@ use sqlx::{postgres::PgQueryResult, PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::{
-    routes::lead_route::{FounderDomain, FounderDomainEmail, FounderElement, FounderTagCandidate},
+    domain::html_tag::HtmlTag,
+    routes::lead_route::{FounderDomain, FounderDomainEmail, FounderTagCandidate},
     services::FRESH_RESULTS,
 };
 
@@ -303,14 +304,15 @@ pub async fn insert_founders(
     for (ele, name) in founder.elements.into_iter().zip(names.into_iter()) {
         let content;
         let element_type = match ele {
-            FounderElement::Span(c) => {
+            HtmlTag::SpanTag(c) => {
                 content = c;
                 ElementType::Span
             }
-            FounderElement::H3(c) => {
+            HtmlTag::H3Tag(c) => {
                 content = c;
                 ElementType::HThree
             }
+            _ => continue,
         };
 
         _ = sqlx::query!(

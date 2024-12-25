@@ -13,7 +13,7 @@ use crate::{
     },
     domain::{
         google_webpage::{DataExtractionIntent, GoogleWebPage},
-        html_tag::HtmlTag,
+        html_tag::{extract_founder_name, HtmlTag},
     },
     services::{
         extract_data_from_google_search_with_reqwest, save_product_search_queries,
@@ -261,14 +261,8 @@ async fn save_urls_from_google_searche_batch(
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum FounderElement {
-    Span(String),
-    H3(String),
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub struct FounderTagCandidate {
-    pub elements: Vec<FounderElement>, // TODO: Change this to return vec of names
+    pub elements: Vec<HtmlTag>, // TODO: Change this to return vec of names
     pub domain: String,
 }
 
@@ -310,7 +304,11 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
                         FounderThreadResult::Ignore
                     }
                     GoogleSearchResult::Founders(tag_candidate, page_source) => {
-                        let founder_names = extract_founder_names(tag_candidate.clone());
+                        let founder_names = tag_candidate
+                            .elements
+                            .iter()
+                            .map(|ele| extract_founder_name(ele.clone()))
+                            .collect();
 
                         FounderThreadResult::Insert(
                             tag_candidate,
@@ -403,72 +401,6 @@ pub fn get_domain_from_url(url: &str) -> Option<String> {
         },
         None => None,
     }
-}
-
-// TODO: Pass list of elements instead
-pub fn extract_founder_names(founder_candidate: FounderTagCandidate) -> Vec<Option<String>> {
-    founder_candidate
-        .elements
-        .iter()
-        .map(|t| match t {
-            FounderElement::Span(t) => match t.strip_prefix("LinkedIn Â· ") {
-                Some(right_word) => {
-                    let right_word_original = right_word.to_string();
-
-                    let result = match right_word.split(",").collect::<Vec<&str>>().as_slice() {
-                        [name, ..] => name.to_string(),
-                        _ => right_word_original,
-                    };
-
-                    let result = match result.contains("Dr.") {
-                        true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
-                        false => result,
-                    };
-                    let result = match result.contains("Dr") {
-                        true => result.strip_prefix("Dr").unwrap().trim().to_string(),
-                        false => result,
-                    };
-
-                    Some(result)
-                }
-                None => None,
-            },
-            FounderElement::H3(content) => {
-                /*
-                 Match with both in lowercase
-                 1. Split by "'s Post -" and get content before the split
-                 3. Split by "on LinkedIn" and get content before the split
-                 4. Split by "posted on" and get content before the split
-                 2. Split by "-" and get content before the split
-                 5. Split by "|" and get content before the split
-                */
-                let strategies = [
-                    "'s Post -",
-                    "posted on",
-                    "on LinkedIn",
-                    "en LinkedIn",
-                    "auf LinkedIn",
-                    "sur LinkedIn",
-                    "-",
-                    "–", // I know, this is a different character
-                    "|",
-                ];
-
-                let strategies: Vec<String> =
-                    strategies.iter().map(|st| st.to_lowercase()).collect();
-                let content = content.to_lowercase();
-
-                strategies
-                    .iter()
-                    .filter_map(|st| {
-                        content
-                            .split_once(st)
-                            .map(|parts| parts.0.trim().to_string())
-                    })
-                    .next()
-            }
-        })
-        .collect()
 }
 
 #[derive(Clone)]
@@ -618,9 +550,11 @@ pub async fn filter_verified_emails(
 mod tests {
     use itertools::Itertools;
 
-    use crate::routes::lead_route::{
-        extract_founder_names, get_domain_from_url, get_email_permutations, FounderElement,
-        FounderTagCandidate,
+    use crate::{
+        domain::html_tag::HtmlTag,
+        routes::lead_route::{
+            extract_founder_name, get_domain_from_url, get_email_permutations, FounderTagCandidate,
+        },
     };
 
     #[test]
@@ -758,8 +692,8 @@ mod tests {
                 // FounderElement::H3("Kathy Avilla - Traditional Medicinals, Inc.".to_string()),
                 // FounderElement::H3("Ben Hindman's Post - sxsw".to_string()),
                 // FounderElement::H3("David Templeton - COMMUNITY ACTION OF NAPA VALLEY".to_string()),
-                FounderElement::H3("Swati Bhargava - CashKaro.com - LinkedIn".to_string()),
-                FounderElement::H3("Rohan Bhargava - CashKaro.com - LinkedIn".to_string()),
+                HtmlTag::H3Tag("Swati Bhargava - CashKaro.com - LinkedIn".to_string()),
+                HtmlTag::H3Tag("Rohan Bhargava - CashKaro.com - LinkedIn".to_string()),
                 // FounderElement::H3("Yatinn Ram Garg - CashKaro.com - LinkedIn".to_string()),
                 // FounderElement::H3(
                 //     "Swati Bhargava's Post - Co-founder of CashKaro.com - LinkedIn".to_string(),
@@ -827,8 +761,12 @@ mod tests {
             "rohan bhargava".to_string(),
         ];
 
-        let results = extract_founder_names(candidate);
-        let results: Vec<String> = results.into_iter().flatten().collect();
+        let results: Vec<String> = candidate
+            .elements
+            .iter()
+            .map(|ele| extract_founder_name(ele.clone()))
+            .flatten()
+            .collect();
         let results: Vec<String> = results.into_iter().unique().collect();
         assert_eq!(results, expected)
     }

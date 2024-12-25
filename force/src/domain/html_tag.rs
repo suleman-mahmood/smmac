@@ -1,6 +1,68 @@
+#[derive(Debug, PartialEq, Clone)]
 pub enum HtmlTag {
     ATag(String),
     H3Tag(String),
     SpanTag(String),
     NextPageATag(String),
+}
+
+pub fn extract_founder_name(tag: HtmlTag) -> Option<String> {
+    match tag {
+        HtmlTag::SpanTag(t) => match t.strip_prefix("LinkedIn Â· ") {
+            Some(right_word) => {
+                let right_word_original = right_word.to_string();
+
+                let result = match right_word.split(",").collect::<Vec<&str>>().as_slice() {
+                    [name, ..] => name.to_string(),
+                    _ => right_word_original,
+                };
+
+                let result = match result.contains("Dr.") {
+                    true => result.strip_prefix("Dr.").unwrap().trim().to_string(),
+                    false => result,
+                };
+                let result = match result.contains("Dr") {
+                    true => result.strip_prefix("Dr").unwrap().trim().to_string(),
+                    false => result,
+                };
+
+                Some(result)
+            }
+            None => None,
+        },
+        HtmlTag::H3Tag(content) => {
+            /*
+             Match with both in lowercase
+             1. Split by "'s Post -" and get content before the split
+             3. Split by "on LinkedIn" and get content before the split
+             4. Split by "posted on" and get content before the split
+             2. Split by "-" and get content before the split
+             5. Split by "|" and get content before the split
+            */
+            let strategies = [
+                "'s Post -",
+                "posted on",
+                "on LinkedIn",
+                "en LinkedIn",
+                "auf LinkedIn",
+                "sur LinkedIn",
+                "-",
+                "–", // I know, this is a different character
+                "|",
+            ];
+
+            let strategies: Vec<String> = strategies.iter().map(|st| st.to_lowercase()).collect();
+            let content = content.to_lowercase();
+
+            strategies
+                .iter()
+                .filter_map(|st| {
+                    content
+                        .split_once(st)
+                        .map(|parts| parts.0.trim().to_string())
+                })
+                .next()
+        }
+        _ => None,
+    }
 }
