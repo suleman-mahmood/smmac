@@ -7,7 +7,9 @@ const SET_RESET_LEN: usize = 10_000;
 
 use crate::{
     domain::html_tag::extract_domain,
-    routes::lead_route::{build_founder_seach_query, BLACK_LIST_DOMAINS},
+    routes::lead_route::{
+        build_founder_seach_queries, build_founder_seach_query, BLACK_LIST_DOMAINS,
+    },
 };
 
 use super::{
@@ -90,10 +92,14 @@ async fn scrape_domain_query(
                             .iter()
                             .any(|&blacklist| domain.contains(blacklist))
                         {
-                            let query = build_founder_seach_query(&domain);
-                            founder_query_sender
-                                .send(FounderQueryChannelData { query, domain })
-                                .unwrap();
+                            for query in build_founder_seach_queries(&domain) {
+                                founder_query_sender
+                                    .send(FounderQueryChannelData {
+                                        query,
+                                        domain: domain.clone(),
+                                    })
+                                    .unwrap();
+                            }
                         }
                     }
                 }
