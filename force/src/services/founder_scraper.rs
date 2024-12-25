@@ -88,7 +88,10 @@ async fn scrape_founder_query(
                 .collect();
 
             for em in emails {
-                email_sender.send(em.email).unwrap();
+                email_sender.send(em.email.clone()).unwrap();
+                persistant_data_sender
+                    .send(PersistantData::Email(em))
+                    .unwrap();
             }
             let page_data = FounderPageData {
                 page_source: page_source.clone(),
