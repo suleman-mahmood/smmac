@@ -218,7 +218,10 @@ async fn save_urls_from_google_searche_batch(
                 let founder_search_queries: Vec<Option<String>> = domains
                     .clone()
                     .into_iter()
-                    .map(|dom| dom.as_deref().map(build_founder_seach_query))
+                    .map(|dom| {
+                        dom.as_deref()
+                            .map(|d| build_founder_seach_queries(d).first().unwrap().to_string())
+                    })
                     .collect();
 
                 (
@@ -363,14 +366,6 @@ pub fn build_founder_seach_queries(domain: &str) -> Vec<String> {
         .into_iter()
         .map(|t| format!(r#"site:linkedin.com "{}" AND "{}""#, domain, t))
         .collect()
-}
-
-// TODO: Remove this
-pub fn build_founder_seach_query(domain: &str) -> String {
-    format!(
-        r#"site:linkedin.com "{}" AND "founder""#,
-        domain.to_lowercase()
-    )
 }
 
 #[derive(Clone)]

@@ -7,9 +7,7 @@ const SET_RESET_LEN: usize = 10_000;
 
 use crate::{
     domain::html_tag::extract_domain,
-    routes::lead_route::{
-        build_founder_seach_queries, build_founder_seach_query, BLACK_LIST_DOMAINS,
-    },
+    routes::lead_route::{build_founder_seach_queries, BLACK_LIST_DOMAINS},
 };
 
 use super::{
