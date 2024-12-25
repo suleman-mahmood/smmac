@@ -1,3 +1,5 @@
+use url::Url;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum HtmlTag {
     ATag(String),
@@ -63,6 +65,37 @@ pub fn extract_founder_name(tag: HtmlTag) -> Option<String> {
                 })
                 .next()
         }
+        _ => None,
+    }
+}
+
+pub fn extract_domain(tag: HtmlTag) -> Option<String> {
+    match tag {
+        HtmlTag::ATag(content) => match content.strip_prefix("/url?q=") {
+            Some(url) => match Url::parse(url) {
+                Ok(parsed_url) => match parsed_url.host_str() {
+                    Some("support.google.com") => None,
+                    Some("www.google.com") => None,
+                    Some("accounts.google.com") => None,
+                    Some("policies.google.com") => None,
+                    Some("www.amazon.com") => None,
+                    Some("") => None,
+                    None => None,
+                    Some(any_host) => {
+                        if any_host.contains("google.com") {
+                            None
+                        } else {
+                            match any_host.strip_prefix("www.") {
+                                Some(h) => Some(h.to_lowercase()),
+                                None => Some(any_host.to_lowercase()),
+                            }
+                        }
+                    }
+                },
+                Err(_) => None,
+            },
+            None => None,
+        },
         _ => None,
     }
 }

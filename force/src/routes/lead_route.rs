@@ -3,7 +3,6 @@ use check_if_email_exists::Reachable;
 use serde::Deserialize;
 use sqlx::{Acquire, PgPool};
 use tokio::task::JoinSet;
-use url::Url;
 
 use crate::{
     dal::{
@@ -13,7 +12,7 @@ use crate::{
     },
     domain::{
         google_webpage::{DataExtractionIntent, GoogleWebPage},
-        html_tag::{extract_founder_name, HtmlTag},
+        html_tag::{extract_domain, extract_founder_name, HtmlTag},
     },
     services::{
         extract_data_from_google_search_with_reqwest, save_product_search_queries,
@@ -171,7 +170,7 @@ async fn save_urls_from_google_searche_batch(
                 // Fetch domain urls for url, if exist don't search
 
                 let mut current_url = None;
-                let mut domain_urls_list: Vec<String> = vec![];
+                let mut domain_urls_list: Vec<HtmlTag> = vec![];
                 let mut page_source_list: Vec<(String, u8)> = vec![];
                 let mut not_found = false;
 
@@ -214,7 +213,7 @@ async fn save_urls_from_google_searche_batch(
 
                 let domains: Vec<Option<String>> = domain_urls_list
                     .iter()
-                    .map(|url| get_domain_from_url(url))
+                    .map(|tag| extract_domain(tag.clone()))
                     .collect();
                 let founder_search_queries: Vec<Option<String>> = domains
                     .clone()
@@ -251,8 +250,7 @@ async fn save_urls_from_google_searche_batch(
                         .unwrap();
 
                     for tag in r.0.clone() {
-                        let html_tag = HtmlTag::ATag(tag);
-                        _ = html_tag_db::insert_html_tag(con, html_tag, page_id).await;
+                        _ = html_tag_db::insert_html_tag(con, tag, page_id).await;
                     }
                 }
             }
@@ -373,34 +371,6 @@ pub fn build_founder_seach_query(domain: &str) -> String {
         r#"site:linkedin.com "{}" AND "founder""#,
         domain.to_lowercase()
     )
-}
-
-pub fn get_domain_from_url(url: &str) -> Option<String> {
-    match url.strip_prefix("/url?q=") {
-        Some(url) => match Url::parse(url) {
-            Ok(parsed_url) => match parsed_url.host_str() {
-                Some("support.google.com") => None,
-                Some("www.google.com") => None,
-                Some("accounts.google.com") => None,
-                Some("policies.google.com") => None,
-                Some("www.amazon.com") => None,
-                Some("") => None,
-                None => None,
-                Some(any_host) => {
-                    if any_host.contains("google.com") {
-                        None
-                    } else {
-                        match any_host.strip_prefix("www.") {
-                            Some(h) => Some(h.to_lowercase()),
-                            None => Some(any_host.to_lowercase()),
-                        }
-                    }
-                }
-            },
-            Err(_) => None,
-        },
-        None => None,
-    }
 }
 
 #[derive(Clone)]
@@ -551,10 +521,8 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{
-        domain::html_tag::HtmlTag,
-        routes::lead_route::{
-            extract_founder_name, get_domain_from_url, get_email_permutations, FounderTagCandidate,
-        },
+        domain::html_tag::{extract_domain, HtmlTag},
+        routes::lead_route::{extract_founder_name, get_email_permutations, FounderTagCandidate},
     };
 
     #[test]
@@ -573,7 +541,7 @@ mod tests {
             "https://www.amazon.com/Organic-Pure-Green-Tea-Bags/dp/B00FTAYNKE",
         ];
         for url in raw_urls {
-            let result = get_domain_from_url(url);
+            let result = extract_domain(HtmlTag::ATag(url.to_string()));
             assert!(result.is_none());
         }
     }
@@ -600,7 +568,7 @@ mod tests {
             "traditionalmedicinals.com",
         ];
         for (url, expected) in raw_urls.iter().zip(expected.iter()) {
-            let result = get_domain_from_url(url);
+            let result = extract_domain(HtmlTag::ATag(url.to_string()));
             assert!(result.is_some());
             assert_eq!(result.unwrap(), expected.to_string());
         }

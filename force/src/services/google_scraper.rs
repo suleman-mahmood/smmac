@@ -17,7 +17,7 @@ pub enum GoogleSearchType {
 pub enum GoogleSearchResult {
     NotFound,
     Domains {
-        domain_urls: Vec<String>,
+        domain_urls: Vec<HtmlTag>,
         next_page_url: Option<String>,
         page_source: String,
     },
@@ -116,7 +116,7 @@ pub async fn extract_data_from_google_search_with_reqwest(
                             );
 
                             return GoogleSearchResult::Domains {
-                                domain_urls: links,
+                                domain_urls: links.into_iter().map(HtmlTag::ATag).collect(),
                                 next_page_url,
                                 page_source: html_content,
                             };

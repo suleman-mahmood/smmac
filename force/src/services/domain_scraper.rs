@@ -6,8 +6,8 @@ const PAGE_DEPTH: u8 = 1;
 const SET_RESET_LEN: usize = 10_000;
 
 use crate::{
-    domain::html_tag::HtmlTag,
-    routes::lead_route::{build_founder_seach_query, get_domain_from_url, BLACK_LIST_DOMAINS},
+    domain::html_tag::extract_domain,
+    routes::lead_route::{build_founder_seach_query, BLACK_LIST_DOMAINS},
 };
 
 use super::{
@@ -84,7 +84,7 @@ async fn scrape_domain_query(
                 page_source,
             } => {
                 for domain_url in domain_urls.iter() {
-                    if let Some(domain) = get_domain_from_url(domain_url) {
+                    if let Some(domain) = extract_domain(domain_url.clone()) {
                         // Remove blacklisted domains
                         if BLACK_LIST_DOMAINS
                             .iter()
@@ -101,14 +101,10 @@ async fn scrape_domain_query(
                 let data = DomainPageData {
                     page_source,
                     page_number: current_page_index + 1,
-                    html_tags: domain_urls
-                        .clone()
-                        .into_iter()
-                        .map(|url| HtmlTag::ATag(url))
-                        .collect(),
+                    html_tags: domain_urls.clone(),
                     domains: domain_urls
                         .iter()
-                        .map(|url| get_domain_from_url(url))
+                        .map(|tag| extract_domain(tag.clone()))
                         .collect(),
                 };
                 pages_data.push(data);
