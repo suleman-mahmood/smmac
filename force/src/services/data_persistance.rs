@@ -40,12 +40,10 @@ pub struct DomainPageData {
 pub enum FounderData {
     Result {
         query: String,
-        domain: String,
         page_data: FounderPageData,
     },
     NoResult {
         query: String,
-        domain: String,
     },
 }
 
@@ -113,12 +111,48 @@ pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>, p
                     }
                 },
                 PersistantData::Founder(data) => match data {
-                    FounderData::NoResult { query, domain } => todo!(),
-                    FounderData::Result {
-                        query,
-                        domain,
-                        page_data,
-                    } => todo!(),
+                    FounderData::NoResult { query } => {
+                        let webpage = GoogleWebPage {
+                            search_query: query.clone(),
+                            page_source: "".to_string(),
+                            page_number: 0,
+                            data_extraction_intent: DataExtractionIntent::FounderName,
+                            any_result: false,
+                        };
+
+                        google_webpage_db::insert_web_page(con, webpage)
+                            .await
+                            .unwrap();
+                    }
+                    FounderData::Result { query, page_data } => {
+                        let webpage = GoogleWebPage {
+                            search_query: query.clone(),
+                            page_source: page_data.page_source,
+                            page_number: page_data.page_number,
+                            data_extraction_intent: DataExtractionIntent::FounderName,
+                            any_result: true,
+                        };
+
+                        let web_page_id = google_webpage_db::insert_web_page(con, webpage)
+                            .await
+                            .unwrap();
+
+                        for (i, tag) in page_data.html_tags.into_iter().enumerate() {
+                            let tag_id = html_tag_db::insert_html_tag(con, tag, web_page_id)
+                                .await
+                                .unwrap();
+
+                            if let Some(Some(domain)) = page_data.founder_names.get(i) {
+                                data_extract_db::insert_data(
+                                    con,
+                                    DataExtract::FounderName(domain.to_string()),
+                                    tag_id,
+                                )
+                                .await
+                                .unwrap();
+                            }
+                        }
+                    }
                 },
                 PersistantData::Email(data) => todo!(),
             },

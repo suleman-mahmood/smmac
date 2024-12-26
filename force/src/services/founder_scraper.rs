@@ -68,7 +68,6 @@ async fn scrape_founder_query(
             persistant_data_sender
                 .send(PersistantData::Founder(FounderData::NoResult {
                     query: data.query,
-                    domain: data.domain.clone(),
                 }))
                 .unwrap();
             FounderThreadResult::NotFounder(data.domain)
@@ -109,7 +108,6 @@ async fn scrape_founder_query(
             persistant_data_sender
                 .send(PersistantData::Founder(FounderData::Result {
                     query: data.query,
-                    domain: data.domain.clone(),
                     page_data,
                 }))
                 .unwrap();
