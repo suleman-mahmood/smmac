@@ -1,8 +1,17 @@
 use std::time::Duration;
 
 use crossbeam::channel::Receiver;
+use sqlx::{Acquire, PgPool};
 
-use crate::domain::{email::FounderDomainEmail, html_tag::HtmlTag};
+use crate::{
+    dal::{data_extract_db, google_webpage_db, html_tag_db},
+    domain::{
+        data_extract::DataExtract,
+        email::FounderDomainEmail,
+        google_webpage::{DataExtractionIntent, GoogleWebPage},
+        html_tag::HtmlTag,
+    },
+};
 
 pub enum PersistantData {
     Domain(DomainData),
@@ -47,14 +56,72 @@ pub struct FounderPageData {
     pub founder_names: Vec<Option<String>>,
 }
 
-pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>) {
+pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>, pool: PgPool) {
     log::info!("Started data persistance handler");
+
+    // TODO: Make sure that it can live long enough
+    let mut pool_con = pool.acquire().await.unwrap();
+    let con = pool_con.acquire().await.unwrap();
 
     loop {
         match data_receiver.recv() {
-            Ok(data) => {
-                todo!();
-            }
+            Ok(data) => match data {
+                PersistantData::Domain(data) => match data {
+                    DomainData::NoResult { query } => {
+                        let webpage = GoogleWebPage {
+                            search_query: query.clone(),
+                            page_source: "".to_string(),
+                            page_number: 0,
+                            data_extraction_intent: DataExtractionIntent::Domain,
+                            any_result: false,
+                        };
+
+                        google_webpage_db::insert_web_page(con, webpage)
+                            .await
+                            .unwrap();
+                    }
+                    DomainData::Result { query, pages_data } => {
+                        for page_data in pages_data {
+                            let webpage = GoogleWebPage {
+                                search_query: query.clone(),
+                                page_source: page_data.page_source,
+                                page_number: page_data.page_number,
+                                data_extraction_intent: DataExtractionIntent::Domain,
+                                any_result: true,
+                            };
+
+                            let web_page_id = google_webpage_db::insert_web_page(con, webpage)
+                                .await
+                                .unwrap();
+
+                            for (i, tag) in page_data.html_tags.into_iter().enumerate() {
+                                let tag_id = html_tag_db::insert_html_tag(con, tag, web_page_id)
+                                    .await
+                                    .unwrap();
+
+                                if let Some(Some(domain)) = page_data.domains.get(i) {
+                                    data_extract_db::insert_data(
+                                        con,
+                                        DataExtract::Domain(domain.to_string()),
+                                        tag_id,
+                                    )
+                                    .await
+                                    .unwrap();
+                                }
+                            }
+                        }
+                    }
+                },
+                PersistantData::Founder(data) => match data {
+                    FounderData::NoResult { query, domain } => todo!(),
+                    FounderData::Result {
+                        query,
+                        domain,
+                        page_data,
+                    } => todo!(),
+                },
+                PersistantData::Email(data) => todo!(),
+            },
 
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
         }

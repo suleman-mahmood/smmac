@@ -1,6 +1,6 @@
 pub mod app_db;
 pub mod config_db;
-pub mod data_extract;
+pub mod data_extract_db;
 pub mod google_webpage_db;
 pub mod html_tag_db;
 pub mod lead_db;

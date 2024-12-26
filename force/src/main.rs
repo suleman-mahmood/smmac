@@ -58,7 +58,10 @@ async fn main() -> std::io::Result<()> {
         persistant_data_sender,
     ));
     tokio::spawn(email_verified_handler(sentinel.clone(), email_receiver));
-    tokio::spawn(data_persistance_handler(persistant_data_receiver));
+    tokio::spawn(data_persistance_handler(
+        persistant_data_receiver,
+        connection_pool.clone(),
+    ));
 
     run(
         listener,
