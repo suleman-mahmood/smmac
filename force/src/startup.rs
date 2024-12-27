@@ -35,7 +35,11 @@ pub fn run(
             .service(default_route::default)
             .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
             .service(web::scope("/lightning").service(lead_route::get_leads_from_niche))
-            .service(web::scope("/exp").service(exp_route::check_channel_works))
+            .service(
+                web::scope("/exp")
+                    .service(exp_route::check_channel_works)
+                    .service(exp_route::migrate),
+            )
             // .service(
             //     web::scope("/exp")
             // .service(experiment_route::get_gpt_results)

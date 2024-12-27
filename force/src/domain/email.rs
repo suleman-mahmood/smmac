@@ -1,4 +1,7 @@
 use check_if_email_exists::Reachable;
+use serde::Deserialize;
+
+use crate::dal::lead_db::{EmailReachability, EmailVerifiedStatus};
 
 pub struct Email {
     pub email_address: String,
@@ -8,6 +11,8 @@ pub struct Email {
     pub reachability: Reachability,
 }
 
+#[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VerificationStatus", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum VerificationStatus {
     Pending,
     Verified,
@@ -15,6 +20,18 @@ pub enum VerificationStatus {
     CatchAll,
 }
 
+impl From<EmailVerifiedStatus> for VerificationStatus {
+    fn from(value: EmailVerifiedStatus) -> Self {
+        match value {
+            EmailVerifiedStatus::Pending => Self::Pending,
+            EmailVerifiedStatus::Verified => Self::Verified,
+            EmailVerifiedStatus::Invalid => Self::Invalid,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "Reachability", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Reachability {
     Safe,
     Unknown,
@@ -29,6 +46,17 @@ impl From<Reachable> for Reachability {
             Reachable::Unknown => Reachability::Unknown,
             Reachable::Risky => Reachability::Risky,
             Reachable::Invalid => Reachability::Invalid,
+        }
+    }
+}
+
+impl From<EmailReachability> for Reachability {
+    fn from(value: EmailReachability) -> Self {
+        match value {
+            EmailReachability::Safe => Self::Safe,
+            EmailReachability::Unknown => Self::Unknown,
+            EmailReachability::Risky => Self::Risky,
+            EmailReachability::Invalid => Self::Invalid,
         }
     }
 }
