@@ -24,7 +24,7 @@ pub struct FounderQueryChannelData {
 
 pub async fn founder_scraper_handler(
     founder_query_receiver: Receiver<FounderQueryChannelData>,
-    email_sender: Sender<String>,
+    email_sender: Sender<FounderDomainEmail>,
     persistant_data_sender: Sender<PersistantData>,
 ) {
     log::info!("Started founder scraper");
@@ -54,7 +54,7 @@ pub async fn founder_scraper_handler(
 
 async fn scrape_founder_query(
     data: FounderQueryChannelData,
-    email_sender: Sender<String>,
+    email_sender: Sender<FounderDomainEmail>,
     persistant_data_sender: Sender<PersistantData>,
 ) {
     let google_search_result = extract_data_from_google_search_with_reqwest(
@@ -93,7 +93,7 @@ async fn scrape_founder_query(
                 .collect();
 
             for em in emails {
-                email_sender.send(em.email.clone()).unwrap();
+                email_sender.send(em.clone()).unwrap();
                 persistant_data_sender
                     .send(PersistantData::Email(em))
                     .unwrap();

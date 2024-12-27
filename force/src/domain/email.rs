@@ -1,23 +1,36 @@
-struct Email {
-    email_address: String,
-    founder_name: String,
-    domain: String,
-    verification_status: VerificationStatus,
-    reachability: Reachability,
+use check_if_email_exists::Reachable;
+
+pub struct Email {
+    pub email_address: String,
+    pub founder_name: String,
+    pub domain: String,
+    pub verification_status: VerificationStatus,
+    pub reachability: Reachability,
 }
 
-enum VerificationStatus {
+pub enum VerificationStatus {
     Pending,
     Verified,
     Invalid,
     CatchAll,
 }
 
-enum Reachability {
+pub enum Reachability {
     Safe,
     Unknown,
     Risky,
     Invalid,
+}
+
+impl From<Reachable> for Reachability {
+    fn from(value: Reachable) -> Self {
+        match value {
+            Reachable::Safe => Reachability::Safe,
+            Reachable::Unknown => Reachability::Unknown,
+            Reachable::Risky => Reachability::Risky,
+            Reachable::Invalid => Reachability::Invalid,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

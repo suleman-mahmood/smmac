@@ -4,10 +4,10 @@ use crossbeam::channel::Receiver;
 use sqlx::{Acquire, PgPool};
 
 use crate::{
-    dal::{data_extract_db, google_webpage_db, html_tag_db},
+    dal::{data_extract_db, email_db, google_webpage_db, html_tag_db},
     domain::{
         data_extract::DataExtract,
-        email::FounderDomainEmail,
+        email::{Email, FounderDomainEmail, Reachability, VerificationStatus},
         google_webpage::{DataExtractionIntent, GoogleWebPage},
         html_tag::HtmlTag,
     },
@@ -17,6 +17,7 @@ pub enum PersistantData {
     Domain(DomainData),
     Founder(FounderData),
     Email(FounderDomainEmail),
+    UpdateEmailVerified(String),
 }
 
 pub enum DomainData {
@@ -154,7 +155,19 @@ pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>, p
                         }
                     }
                 },
-                PersistantData::Email(data) => todo!(),
+                PersistantData::Email(data) => {
+                    let email = Email {
+                        email_address: data.email,
+                        founder_name: data.founder_name,
+                        domain: data.domain,
+                        verification_status: VerificationStatus::Pending,
+                        reachability: Reachability::Unknown,
+                    };
+                    _ = email_db::insert_email(con, email).await;
+                }
+                PersistantData::UpdateEmailVerified(email) => {
+                    _ = email_db::update_email_verified(con, email).await;
+                }
             },
 
             Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,

@@ -5,6 +5,7 @@ use crossbeam::channel::unbounded;
 use env_logger::Env;
 use force::{
     configuration::get_configuration,
+    domain::email::FounderDomainEmail,
     services::{
         data_persistance_handler, domain_scraper_handler, email_verified_handler,
         founder_scraper_handler, FounderQueryChannelData, OpenaiClient, PersistantData,
@@ -39,7 +40,7 @@ async fn main() -> std::io::Result<()> {
 
     let (product_query_sender, product_query_receiver) = unbounded::<String>();
     let (founder_query_sender, founder_query_receiver) = unbounded::<FounderQueryChannelData>();
-    let (email_sender, email_receiver) = unbounded::<String>();
+    let (email_sender, email_receiver) = unbounded::<FounderDomainEmail>();
     let (persistant_data_sender, persistant_data_receiver) = unbounded::<PersistantData>();
 
     let product_query_sender = ProductQuerySender {
@@ -55,9 +56,13 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(founder_scraper_handler(
         founder_query_receiver,
         email_sender,
+        persistant_data_sender.clone(),
+    ));
+    tokio::spawn(email_verified_handler(
+        sentinel.clone(),
+        email_receiver,
         persistant_data_sender,
     ));
-    tokio::spawn(email_verified_handler(sentinel.clone(), email_receiver));
     tokio::spawn(data_persistance_handler(
         persistant_data_receiver,
         connection_pool.clone(),
