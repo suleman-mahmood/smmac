@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
 use actix_web::web::Data;
 use check_if_email_exists::Reachable;
@@ -18,24 +18,26 @@ pub async fn email_verified_handler(
     log::info!("Started email verifier handler");
     let mut seen_emails = HashSet::new();
 
-    loop {
-        match email_receiver.recv() {
-            Ok(email) => match seen_emails.contains(&email.email) {
-                true => {}
-                false => {
-                    // TODO: Implement time based reset like 10 mins after channel was empty
-                    if seen_emails.len() > SET_RESET_LEN {
-                        seen_emails.clear();
-                    }
-                    seen_emails.insert(email.email.clone());
-                    tokio::spawn(verify_email(
-                        sentinel.clone(),
-                        persistant_data_sender.clone(),
-                        email,
-                    ));
+    for email in email_receiver.iter() {
+        log::info!(
+            "Email verifier handler has {} elements",
+            email_receiver.len()
+        );
+
+        match seen_emails.contains(&email.email) {
+            true => {}
+            false => {
+                // TODO: Implement time based reset like 10 mins after channel was empty
+                if seen_emails.len() > SET_RESET_LEN {
+                    seen_emails.clear();
                 }
-            },
-            Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
+                seen_emails.insert(email.email.clone());
+                tokio::spawn(verify_email(
+                    sentinel.clone(),
+                    persistant_data_sender.clone(),
+                    email,
+                ));
+            }
         }
     }
 }
@@ -45,6 +47,8 @@ async fn verify_email(
     persistant_data_sender: Sender<PersistantData>,
     email: FounderDomainEmail,
 ) {
+    log::info!("Verifying email: {}", email.email);
+
     let reachable = sentinel.get_email_verification_status(&email.email).await;
     match reachable {
         Reachable::Safe => {

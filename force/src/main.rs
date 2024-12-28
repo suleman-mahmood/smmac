@@ -48,25 +48,30 @@ async fn main() -> std::io::Result<()> {
     };
 
     // Spawn tasks
-    tokio::spawn(domain_scraper_handler(
-        product_query_receiver,
-        founder_query_sender,
-        persistant_data_sender.clone(),
-    ));
-    tokio::spawn(founder_scraper_handler(
-        founder_query_receiver,
-        email_sender,
-        persistant_data_sender.clone(),
-    ));
-    tokio::spawn(email_verified_handler(
-        sentinel.clone(),
-        email_receiver,
-        persistant_data_sender,
-    ));
-    tokio::spawn(data_persistance_handler(
-        persistant_data_receiver,
-        connection_pool.clone(),
-    ));
+    let pers_data_clone = persistant_data_sender.clone();
+    tokio::spawn(async move {
+        domain_scraper_handler(
+            product_query_receiver,
+            founder_query_sender,
+            pers_data_clone,
+        )
+        .await
+    });
+
+    let pers_data_clone = persistant_data_sender.clone();
+    tokio::spawn(async move {
+        founder_scraper_handler(founder_query_receiver, email_sender, pers_data_clone).await
+    });
+
+    let sent_clone = sentinel.clone();
+    tokio::spawn(async move {
+        email_verified_handler(sent_clone, email_receiver, persistant_data_sender).await
+    });
+
+    let pool_clone = connection_pool.clone();
+    tokio::spawn(
+        async move { data_persistance_handler(persistant_data_receiver, pool_clone).await },
+    );
 
     run(
         listener,

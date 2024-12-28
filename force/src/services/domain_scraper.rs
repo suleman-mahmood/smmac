@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
 use crossbeam::channel::{Receiver, Sender};
 
@@ -27,25 +27,26 @@ pub async fn domain_scraper_handler(
     log::info!("Started domain scraper");
     let mut seen_queries = HashSet::new();
 
-    loop {
-        match product_query_receiver.recv() {
-            Ok(query) => match seen_queries.contains(&query) {
-                true => {}
-                false => {
-                    // TODO: Implement time based reset like 10 mins after channel was empty
-                    if seen_queries.len() > SET_RESET_LEN {
-                        seen_queries.clear();
-                    }
-                    seen_queries.insert(query.clone());
-                    tokio::spawn(scrape_domain_query(
-                        query,
-                        founder_query_sender.clone(),
-                        persistant_data_sender.clone(),
-                    ));
-                }
-            },
+    for query in product_query_receiver.iter() {
+        log::info!(
+            "Domain scraper handler has {} elements",
+            product_query_receiver.len()
+        );
 
-            Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
+        match seen_queries.contains(&query) {
+            true => {}
+            false => {
+                // TODO: Implement time based reset like 10 mins after channel was empty
+                if seen_queries.len() > SET_RESET_LEN {
+                    seen_queries.clear();
+                }
+                seen_queries.insert(query.clone());
+                tokio::spawn(scrape_domain_query(
+                    query,
+                    founder_query_sender.clone(),
+                    persistant_data_sender.clone(),
+                ));
+            }
         }
     }
 }
@@ -55,7 +56,7 @@ async fn scrape_domain_query(
     founder_query_sender: Sender<FounderQueryChannelData>,
     persistant_data_sender: Sender<PersistantData>,
 ) {
-    // Fetch domain urls for url, if exist don't search
+    log::info!("Scraping google for domain: {}", query);
 
     let mut current_url = None;
     let mut not_found = false;
@@ -86,7 +87,7 @@ async fn scrape_domain_query(
                 for domain_url in domain_urls.iter() {
                     if let Some(domain) = extract_domain(domain_url.clone()) {
                         // Remove blacklisted domains
-                        if BLACK_LIST_DOMAINS
+                        if !BLACK_LIST_DOMAINS
                             .iter()
                             .any(|&blacklist| domain.contains(blacklist))
                         {

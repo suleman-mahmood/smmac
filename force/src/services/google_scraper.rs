@@ -62,6 +62,8 @@ pub async fn extract_data_from_google_search_with_reqwest(
             _ => client.get(GOOGLE_URL).query(&query),
         };
 
+        log::info!("Sending reqwest for query: {}", query.q);
+
         match req.send().await {
             Ok(res) => {
                 let html_content_result = res.text().await;

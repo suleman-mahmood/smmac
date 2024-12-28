@@ -12,7 +12,7 @@ use sqlx::PgPool;
 use crate::{
     routes::{
         dashboard_route, default_route, domain_route, email_route, exp_route, founder_route,
-        lead_route, login_route, product_route, verified_email_route,
+        lead_route, lightning_route, login_route, product_route, verified_email_route,
     },
     services::{OpenaiClient, ProductQuerySender, Sentinel},
 };
@@ -34,7 +34,7 @@ pub fn run(
             .service(Files::new("/static", "./templates/static").prefer_utf8(true))
             .service(default_route::default)
             .service(web::scope("/lead").service(lead_route::get_leads_from_niche))
-            .service(web::scope("/lightning").service(lead_route::get_leads_from_niche))
+            .service(web::scope("/lightning").service(lightning_route::get_lightning_leads))
             .service(
                 web::scope("/exp")
                     .service(exp_route::check_channel_works)

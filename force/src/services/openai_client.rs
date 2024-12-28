@@ -99,7 +99,9 @@ pub async fn save_product_search_queries(
         .map(|p| p.trim().to_lowercase())
         .collect();
 
-    _ = niche_db::insert_niche(pool, niche, &prompt, products.clone()).await;
+    if let Err(e) = niche_db::insert_niche(pool, niche, &prompt, products.clone()).await {
+        log::error!("DB error inserting products in niche table: {:?}", e);
+    }
 
     products
 }

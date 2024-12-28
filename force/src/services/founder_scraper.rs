@@ -2,12 +2,9 @@ use std::{collections::HashSet, time::Duration};
 
 use crossbeam::channel::{Receiver, Sender};
 
-use crate::{
-    domain::{
-        email::{construct_email_permutations, FounderDomainEmail},
-        html_tag::extract_founder_name,
-    },
-    routes::lead_route::FounderThreadResult,
+use crate::domain::{
+    email::{construct_email_permutations, FounderDomainEmail},
+    html_tag::extract_founder_name,
 };
 
 use super::{
@@ -30,24 +27,26 @@ pub async fn founder_scraper_handler(
     log::info!("Started founder scraper");
     let mut seen_queries = HashSet::new();
 
-    loop {
-        match founder_query_receiver.recv() {
-            Ok(data) => match seen_queries.contains(&data.query) {
-                true => {}
-                false => {
-                    // TODO: Implement time based reset like 10 mins after channel was empty
-                    if seen_queries.len() > SET_RESET_LEN {
-                        seen_queries.clear();
-                    }
-                    seen_queries.insert(data.query.clone());
-                    tokio::spawn(scrape_founder_query(
-                        data,
-                        email_sender.clone(),
-                        persistant_data_sender.clone(),
-                    ));
+    for data in founder_query_receiver.iter() {
+        log::info!(
+            "Founder scraper handler has {} elements",
+            founder_query_receiver.len()
+        );
+
+        match seen_queries.contains(&data.query) {
+            true => {}
+            false => {
+                // TODO: Implement time based reset like 10 mins after channel was empty
+                if seen_queries.len() > SET_RESET_LEN {
+                    seen_queries.clear();
                 }
-            },
-            Err(_) => tokio::time::sleep(Duration::from_secs(5)).await,
+                seen_queries.insert(data.query.clone());
+                tokio::spawn(scrape_founder_query(
+                    data,
+                    email_sender.clone(),
+                    persistant_data_sender.clone(),
+                ));
+            }
         }
     }
 }
@@ -57,24 +56,24 @@ async fn scrape_founder_query(
     email_sender: Sender<FounderDomainEmail>,
     persistant_data_sender: Sender<PersistantData>,
 ) {
+    log::info!("Scraping google for founder: {}", data.query);
+
     let google_search_result = extract_data_from_google_search_with_reqwest(
         data.query.clone(),
         GoogleSearchType::Founder(data.domain.clone()),
     )
     .await;
 
-    _ = match google_search_result {
+    match google_search_result {
         GoogleSearchResult::NotFound => {
             persistant_data_sender
                 .send(PersistantData::Founder(FounderData::NoResult {
                     query: data.query,
                 }))
                 .unwrap();
-            FounderThreadResult::NotFounder(data.domain)
         }
         GoogleSearchResult::Domains { .. } => {
             log::error!("Returning domains from founder google search");
-            FounderThreadResult::Ignore
         }
         GoogleSearchResult::Founders(tag_candidate, page_source) => {
             let founder_names: Vec<Option<String>> = tag_candidate
@@ -111,11 +110,9 @@ async fn scrape_founder_query(
                     page_data,
                 }))
                 .unwrap();
-            FounderThreadResult::Insert(tag_candidate, founder_names, data.domain, page_source)
         }
         GoogleSearchResult::CaptchaBlocked => {
             log::error!("Returning from captcha blocked on url {}", data.query);
-            FounderThreadResult::Ignore
         }
     };
 }
