@@ -166,7 +166,14 @@ pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>, p
                     reachability: Reachability::Unknown,
                 };
                 if let Err(e) = email_db::insert_email(con, email).await {
-                    log::error!("Error inserting email in db: {:?}", e);
+                    match e {
+                        sqlx::Error::Database(ref data) => {
+                            if data.constraint() != Some("idx_unique_email_email_address") {
+                                log::error!("Error inserting email in db: {:?}", e);
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
             PersistantData::UpdateEmailVerified(email) => {
