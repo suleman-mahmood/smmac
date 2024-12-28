@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into html_tag\n            (text_content, html_tag_type, google_webpage_id)\n        values\n            ($1, $2, $3)\n        returning id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        {
+          "Custom": {
+            "name": "htmltagtype",
+            "kind": {
+              "Enum": [
+                "A_TAG",
+                "H3_TAG",
+                "NEXT_PAGE_A_TAG"
+              ]
+            }
+          }
+        },
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8e9d6e6e7ed486ea0b7043e323500d4b25d85e536feae52357df104384f55624"
+}

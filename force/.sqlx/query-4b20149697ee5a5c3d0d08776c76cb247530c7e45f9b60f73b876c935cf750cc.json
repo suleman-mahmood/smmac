@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into data_extract\n            (data, data_type, html_tag_id)\n        values\n            ($1, $2, $3)\n        returning id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        {
+          "Custom": {
+            "name": "datatype",
+            "kind": {
+              "Enum": [
+                "DOMAIN",
+                "FOUNDER_NAME"
+              ]
+            }
+          }
+        },
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4b20149697ee5a5c3d0d08776c76cb247530c7e45f9b60f73b876c935cf750cc"
+}

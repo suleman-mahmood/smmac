@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into niche\n                (user_niche, gippity_prompt, generated_product)\n            values\n                ($1, $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c02321eaff16fb00c44db5a234c14540c308560afc1fd9fa33ee6d1e18c88676"
+}

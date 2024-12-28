@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into google_webpage\n            (search_query, page_source, page_number, data_extraction_intent, any_result)\n        values\n            ($1, $2, $3, $4, $5)\n        returning id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int4",
+        {
+          "Custom": {
+            "name": "dataextractionintent",
+            "kind": {
+              "Enum": [
+                "DOMAIN",
+                "FOUNDER_NAME",
+                "COMPANY_NAME"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "055889061e06257662e1fc0889391b32cc0fc2146c3c4bc52c84d52b0b475f45"
+}

@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select * from product",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "niche",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "product",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "domain_search_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "no_results",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d81e8ed790a5257681858bf5d89a4879cb8872a279d40d08b4f233b261230be6"
+}

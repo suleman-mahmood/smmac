@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            search_query\n        from\n            google_webpage\n        where\n            search_query = any($1)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "search_query",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "df36c8d228e645b35f2dc64b8e77d21731bb4de76450b19ddcbdf70c54defa34"
+}

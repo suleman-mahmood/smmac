@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into niche\n            (user_niche, gippity_prompt, generated_product)\n        select * from unnest (\n            $1::text[],\n            $2::text[],\n            $3::text[]\n        )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb7a4132492da703975d22f80098e90bc0a7863a884c8b3f0c43c87f2ca7c95a"
+}

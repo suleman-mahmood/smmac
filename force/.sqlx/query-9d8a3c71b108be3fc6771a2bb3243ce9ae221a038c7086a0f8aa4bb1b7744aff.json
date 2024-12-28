@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into email\n            (email_address, verification_status, reachability, founder_name, domain)\n        values\n            ($1, 'PENDING', 'UNKNOWN', $2, $3)\n        returning id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9d8a3c71b108be3fc6771a2bb3243ce9ae221a038c7086a0f8aa4bb1b7744aff"
+}

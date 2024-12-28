@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select generated_product from niche where user_niche = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "generated_product",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2eba8f6e436695abcbcf23276747b2492dc72fcfbe4238d080b08f71fd658560"
+}

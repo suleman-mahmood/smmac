@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            gippity_prompt,\n            generated_product\n        from\n            niche\n        where\n            user_niche = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "gippity_prompt",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "generated_product",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "675ceee0453ce730dea685349ba2a4cf4008554d6faea36fbe326b937165f382"
+}
