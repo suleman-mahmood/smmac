@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        with filtered_emails as (\n            select\n                email_address\n            from\n                email\n            where\n                verification_status = 'VERIFIED'\n\n            except\n\n            select\n                distinct unnest(array_agg(e.email_address))\n            from\n                email e\n            where\n                e.verification_status = 'VERIFIED'\n            group by\n                e.domain, e.founder_name\n            having\n                count(distinct e.email_address) > 2\n        )\n        select\n            e.email_address as email\n        from\n            filtered_emails fe\n            join email e on e.email_address = fe.email_address\n            join data_extract ded on ded.data = e.domain and ded.data_type = 'DOMAIN'\n            join data_extract def on def.data = e.founder_name and def.data_type = 'FOUNDER_NAME'\n            join html_tag ht on ht.id in (ded.html_tag_id, def.html_tag_id)\n            join google_webpage gw on gw.id = ht.google_webpage_id\n            join niche n on n.generated_product = gw.search_query\n        where\n            n.user_niche = $1 and\n            e.verification_status = 'VERIFIED'\n        group by\n            e.email_address\n        limit $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "85e322c0a613d0c70bc155357b33a62281b829ceb7c6a8c308f4c72fcc65b03f"
+}

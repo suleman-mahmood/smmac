@@ -8,12 +8,12 @@ use force::{
     services::{
         data_persistance_handler, domain_scraper_handler, email_verified_handler,
         founder_scraper_handler, FounderQueryChannelData, OpenaiClient, PersistantData,
-        ProductQuerySender, Sentinel,
+        ProductQuerySender, Sentinel, VerifiedEmailReceiver,
     },
     startup::run,
 };
 use sqlx::postgres::PgPoolOptions;
-use tokio::sync::mpsc;
+use tokio::sync::{self, mpsc};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -44,9 +44,15 @@ async fn main() -> std::io::Result<()> {
     let (email_sender, email_receiver) = mpsc::unbounded_channel::<FounderDomainEmail>();
     let (persistant_data_sender, persistant_data_receiver) =
         mpsc::unbounded_channel::<PersistantData>();
+    let (verified_email_sender, verified_email_receiver) =
+        sync::broadcast::channel::<String>(10_000);
+    drop(verified_email_receiver); // TODO: Remove this?
 
     let product_query_sender = ProductQuerySender {
         sender: product_query_sender,
+    };
+    let verified_email_receiver = VerifiedEmailReceiver {
+        sender: verified_email_sender.clone(),
     };
 
     // Spawn tasks
@@ -67,7 +73,13 @@ async fn main() -> std::io::Result<()> {
 
     let sent_clone = sentinel.clone();
     tokio::spawn(async move {
-        email_verified_handler(sent_clone, email_receiver, persistant_data_sender).await
+        email_verified_handler(
+            sent_clone,
+            email_receiver,
+            persistant_data_sender,
+            verified_email_sender,
+        )
+        .await
     });
 
     let pool_clone = connection_pool.clone();
@@ -81,6 +93,7 @@ async fn main() -> std::io::Result<()> {
         openai_client,
         sentinel,
         product_query_sender,
+        verified_email_receiver,
     )?
     .await
 }

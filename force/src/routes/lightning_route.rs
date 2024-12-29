@@ -4,12 +4,13 @@ use sqlx::PgPool;
 
 use crate::dal::google_webpage_db;
 use crate::routes::lead_route;
-use crate::services::OpenaiClient;
 use crate::services::{save_product_search_queries, ProductQuerySender};
+use crate::services::{OpenaiClient, VerifiedEmailReceiver};
 
 #[derive(Deserialize)]
 struct GetLightningLeadsQuery {
     niche: String,
+    count: i64,
 }
 
 #[get("")]
@@ -18,8 +19,15 @@ async fn get_lightning_leads(
     query: web::Query<GetLightningLeadsQuery>,
     pool: web::Data<PgPool>,
     product_query_sender: web::Data<ProductQuerySender>,
+    verified_email_receiver: web::Data<VerifiedEmailReceiver>,
 ) -> HttpResponse {
     let niche = query.niche.trim().to_lowercase();
+    if query.count < 1 {
+        return HttpResponse::Ok().body("Count should be > 0");
+    }
+
+    // INFO: This channel will now start receiving emails
+    let mut verified_email_receiver = verified_email_receiver.sender.subscribe();
 
     let products = save_product_search_queries(&pool, &openai_client, &niche).await;
 
@@ -36,7 +44,16 @@ async fn get_lightning_leads(
         .iter()
         .for_each(|q| product_query_sender.send(q.to_string()).unwrap());
 
-    // TODO: Get the desired number of emails from db and then return
+    let mut emails = Vec::new();
 
-    HttpResponse::Ok().body("Running for niche!")
+    // TODO: Receive only values for your niche input
+    while let Ok(em) = verified_email_receiver.recv().await {
+        emails.push(em);
+
+        if emails.len() == query.count as usize {
+            break;
+        }
+    }
+
+    HttpResponse::Ok().json(emails)
 }

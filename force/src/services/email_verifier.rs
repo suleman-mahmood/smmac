@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use actix_web::web::Data;
 use check_if_email_exists::Reachable;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::{
+    broadcast,
+    mpsc::{UnboundedReceiver, UnboundedSender},
+};
 
 use crate::domain::email::FounderDomainEmail;
 
@@ -10,10 +13,15 @@ use super::{PersistantData, Sentinel};
 
 const SET_RESET_LEN: usize = 10_000;
 
+pub struct VerifiedEmailReceiver {
+    pub sender: broadcast::Sender<String>,
+}
+
 pub async fn email_verified_handler(
     sentinel: Data<Sentinel>,
     mut email_receiver: UnboundedReceiver<FounderDomainEmail>,
     persistant_data_sender: UnboundedSender<PersistantData>,
+    verified_email_sender: broadcast::Sender<String>,
 ) {
     log::info!("Started email verifier handler");
     let mut seen_emails = HashSet::new();
@@ -35,6 +43,7 @@ pub async fn email_verified_handler(
                 tokio::spawn(verify_email(
                     sentinel.clone(),
                     persistant_data_sender.clone(),
+                    verified_email_sender.clone(),
                     email,
                 ));
             }
@@ -45,6 +54,7 @@ pub async fn email_verified_handler(
 async fn verify_email(
     sentinel: Data<Sentinel>,
     persistant_data_sender: UnboundedSender<PersistantData>,
+    verified_email_sender: broadcast::Sender<String>,
     email: FounderDomainEmail,
 ) {
     log::info!("Verifying email: {}", email.email);
@@ -53,8 +63,9 @@ async fn verify_email(
     match reachable {
         Reachable::Safe => {
             persistant_data_sender
-                .send(PersistantData::UpdateEmailVerified(email.email))
+                .send(PersistantData::UpdateEmailVerified(email.email.clone()))
                 .unwrap();
+            verified_email_sender.send(email.email).unwrap();
         }
         _ => {}
     };
