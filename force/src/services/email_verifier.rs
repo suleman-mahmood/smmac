@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use actix_web::web::Data;
 use check_if_email_exists::Reachable;
-use crossbeam::channel::{Receiver, Sender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::domain::email::FounderDomainEmail;
 
@@ -12,13 +12,13 @@ const SET_RESET_LEN: usize = 10_000;
 
 pub async fn email_verified_handler(
     sentinel: Data<Sentinel>,
-    email_receiver: Receiver<FounderDomainEmail>,
-    persistant_data_sender: Sender<PersistantData>,
+    mut email_receiver: UnboundedReceiver<FounderDomainEmail>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Started email verifier handler");
     let mut seen_emails = HashSet::new();
 
-    for email in email_receiver.iter() {
+    while let Some(email) = email_receiver.recv().await {
         log::info!(
             "Email verifier handler has {} elements",
             email_receiver.len()
@@ -44,7 +44,7 @@ pub async fn email_verified_handler(
 
 async fn verify_email(
     sentinel: Data<Sentinel>,
-    persistant_data_sender: Sender<PersistantData>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
     email: FounderDomainEmail,
 ) {
     log::info!("Verifying email: {}", email.email);

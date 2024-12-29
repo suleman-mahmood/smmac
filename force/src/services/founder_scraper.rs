@@ -1,6 +1,6 @@
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
-use crossbeam::channel::{Receiver, Sender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::domain::{
     email::{construct_email_permutations, FounderDomainEmail},
@@ -20,14 +20,14 @@ pub struct FounderQueryChannelData {
 }
 
 pub async fn founder_scraper_handler(
-    founder_query_receiver: Receiver<FounderQueryChannelData>,
-    email_sender: Sender<FounderDomainEmail>,
-    persistant_data_sender: Sender<PersistantData>,
+    mut founder_query_receiver: UnboundedReceiver<FounderQueryChannelData>,
+    email_sender: UnboundedSender<FounderDomainEmail>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Started founder scraper");
     let mut seen_queries = HashSet::new();
 
-    for data in founder_query_receiver.iter() {
+    while let Some(data) = founder_query_receiver.recv().await {
         log::info!(
             "Founder scraper handler has {} elements",
             founder_query_receiver.len()
@@ -53,8 +53,8 @@ pub async fn founder_scraper_handler(
 
 async fn scrape_founder_query(
     data: FounderQueryChannelData,
-    email_sender: Sender<FounderDomainEmail>,
-    persistant_data_sender: Sender<PersistantData>,
+    email_sender: UnboundedSender<FounderDomainEmail>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Scraping google for founder: {}", data.query);
 

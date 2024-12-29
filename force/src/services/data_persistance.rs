@@ -1,5 +1,5 @@
-use crossbeam::channel::Receiver;
 use sqlx::{Acquire, PgPool};
+use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{
     dal::{data_extract_db, email_db, google_webpage_db, html_tag_db},
@@ -53,10 +53,13 @@ pub struct FounderPageData {
     pub founder_names: Vec<Option<String>>,
 }
 
-pub async fn data_persistance_handler(data_receiver: Receiver<PersistantData>, pool: PgPool) {
+pub async fn data_persistance_handler(
+    mut data_receiver: UnboundedReceiver<PersistantData>,
+    pool: PgPool,
+) {
     log::info!("Started data persistance handler");
 
-    for data in data_receiver.iter() {
+    while let Some(data) = data_receiver.recv().await {
         log::info!(
             "Data persistance handler has {} elements",
             data_receiver.len()

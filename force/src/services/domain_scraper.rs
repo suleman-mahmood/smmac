@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
-use crossbeam::channel::{Receiver, Sender};
-
 const PAGE_DEPTH: u8 = 1;
 const SET_RESET_LEN: usize = 10_000;
+
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     domain::html_tag::extract_domain,
@@ -16,18 +16,18 @@ use super::{
 };
 
 pub struct ProductQuerySender {
-    pub sender: Sender<String>,
+    pub sender: UnboundedSender<String>,
 }
 
 pub async fn domain_scraper_handler(
-    product_query_receiver: Receiver<String>,
-    founder_query_sender: Sender<FounderQueryChannelData>,
-    persistant_data_sender: Sender<PersistantData>,
+    mut product_query_receiver: UnboundedReceiver<String>,
+    founder_query_sender: UnboundedSender<FounderQueryChannelData>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Started domain scraper");
     let mut seen_queries = HashSet::new();
 
-    for query in product_query_receiver.iter() {
+    while let Some(query) = product_query_receiver.recv().await {
         log::info!(
             "Domain scraper handler has {} elements",
             product_query_receiver.len()
@@ -53,8 +53,8 @@ pub async fn domain_scraper_handler(
 
 async fn scrape_domain_query(
     query: String,
-    founder_query_sender: Sender<FounderQueryChannelData>,
-    persistant_data_sender: Sender<PersistantData>,
+    founder_query_sender: UnboundedSender<FounderQueryChannelData>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Scraping google for domain: {}", query);
 

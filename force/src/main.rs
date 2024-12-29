@@ -1,7 +1,6 @@
 use std::{net::TcpListener, time::Duration};
 
 use actix_web::web;
-use crossbeam::channel::unbounded;
 use env_logger::Env;
 use force::{
     configuration::get_configuration,
@@ -14,6 +13,7 @@ use force::{
     startup::run,
 };
 use sqlx::postgres::PgPoolOptions;
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -38,10 +38,12 @@ async fn main() -> std::io::Result<()> {
     let sentinel = Sentinel::new(configuration.api_keys.bulk_email_checker);
     let sentinel = web::Data::new(sentinel);
 
-    let (product_query_sender, product_query_receiver) = unbounded::<String>();
-    let (founder_query_sender, founder_query_receiver) = unbounded::<FounderQueryChannelData>();
-    let (email_sender, email_receiver) = unbounded::<FounderDomainEmail>();
-    let (persistant_data_sender, persistant_data_receiver) = unbounded::<PersistantData>();
+    let (product_query_sender, product_query_receiver) = mpsc::unbounded_channel::<String>();
+    let (founder_query_sender, founder_query_receiver) =
+        mpsc::unbounded_channel::<FounderQueryChannelData>();
+    let (email_sender, email_receiver) = mpsc::unbounded_channel::<FounderDomainEmail>();
+    let (persistant_data_sender, persistant_data_receiver) =
+        mpsc::unbounded_channel::<PersistantData>();
 
     let product_query_sender = ProductQuerySender {
         sender: product_query_sender,
