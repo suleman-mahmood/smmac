@@ -57,13 +57,9 @@ async fn main() -> std::io::Result<()> {
 
     // Spawn backgound tasks
     let pers_data_clone = persistant_data_sender.clone();
+    let fou_q_clone = founder_query_sender.clone();
     tokio::spawn(async move {
-        domain_scraper_handler(
-            product_query_receiver,
-            founder_query_sender,
-            pers_data_clone,
-        )
-        .await
+        domain_scraper_handler(product_query_receiver, fou_q_clone, pers_data_clone).await
     });
 
     let pers_data_clone = persistant_data_sender.clone();
@@ -90,9 +86,9 @@ async fn main() -> std::io::Result<()> {
     });
 
     let pool_clone = connection_pool.clone();
-    tokio::spawn(
-        async move { smart_scout_scraper_handler(pool_clone, persistant_data_sender).await },
-    );
+    tokio::spawn(async move {
+        smart_scout_scraper_handler(pool_clone, founder_query_sender, persistant_data_sender).await
+    });
 
     run(
         listener,

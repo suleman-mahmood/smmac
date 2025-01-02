@@ -6,19 +6,22 @@ use tokio::{sync::mpsc::UnboundedSender, time};
 use crate::{
     dal::smart_scout_db,
     domain::{html_tag::extract_company_name, smart_scout::SmartScout},
-    routes::lead_route::build_company_name_search_query,
+    routes::lead_route::{
+        build_company_name_search_query, build_founder_seach_queries, BLACK_LIST_DOMAINS,
+    },
     services::{
         extract_data_from_google_search_with_reqwest, CompanyNameData, GoogleSearchResult,
         GoogleSearchType,
     },
 };
 
-use super::PersistantData;
+use super::{FounderQueryChannelData, PersistantData};
 
 const N: i64 = 10;
 
 pub async fn smart_scout_scraper_handler(
     pool: PgPool,
+    founder_query_sender: UnboundedSender<FounderQueryChannelData>,
     persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Started smart scout scraper");
@@ -52,6 +55,7 @@ pub async fn smart_scout_scraper_handler(
             smart_scout_db::start_job(con, ss.id).await.unwrap();
             tokio::spawn(scrape_company_domain_query(
                 ss,
+                founder_query_sender.clone(),
                 persistant_data_sender.clone(),
             ));
         }
@@ -60,6 +64,7 @@ pub async fn smart_scout_scraper_handler(
 
 async fn scrape_company_domain_query(
     ss: SmartScout,
+    founder_query_sender: UnboundedSender<FounderQueryChannelData>,
     persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!(
@@ -97,7 +102,19 @@ async fn scrape_company_domain_query(
         } => {
             let company_name = extract_company_name(name_candidates.clone());
 
-            // TODO: Add logic to transfer data to further channels
+            if !BLACK_LIST_DOMAINS
+                .iter()
+                .any(|&blacklist| company_name.contains(blacklist))
+            {
+                for query in build_founder_seach_queries(&company_name) {
+                    founder_query_sender
+                        .send(FounderQueryChannelData {
+                            query,
+                            domain: company_name.clone(),
+                        })
+                        .unwrap();
+                }
+            }
 
             if let Err(e) =
                 persistant_data_sender.send(PersistantData::CompanyName(CompanyNameData::Result {
