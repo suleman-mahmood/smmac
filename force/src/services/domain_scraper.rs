@@ -27,6 +27,7 @@ pub async fn domain_scraper_handler(
     log::info!("Started domain scraper");
     let mut seen_queries = HashSet::new();
 
+    // TODO: Use tokio::select! to check for a signal that asks to move certain tasks from priority queue to backgound
     while let Some(query) = product_query_receiver.recv().await {
         log::info!(
             "Domain scraper handler has {} elements",

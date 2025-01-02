@@ -55,7 +55,7 @@ async fn main() -> std::io::Result<()> {
         sender: verified_email_sender.clone(),
     };
 
-    // Spawn tasks
+    // Spawn backgound tasks
     let pers_data_clone = persistant_data_sender.clone();
     tokio::spawn(async move {
         domain_scraper_handler(

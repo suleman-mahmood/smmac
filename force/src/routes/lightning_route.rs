@@ -51,6 +51,7 @@ async fn get_lightning_leads(
         emails.push(em);
 
         if emails.len() == query.count as usize {
+            // TODO: Inform worker threads to de prioritize the work initiated by this route
             break;
         }
     }
