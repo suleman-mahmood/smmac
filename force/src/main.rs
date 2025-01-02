@@ -72,20 +72,21 @@ async fn main() -> std::io::Result<()> {
     });
 
     let sent_clone = sentinel.clone();
+    let pers_data_clone = persistant_data_sender.clone();
     tokio::spawn(async move {
         email_verified_handler(
             sent_clone,
             email_receiver,
-            persistant_data_sender,
+            pers_data_clone,
             verified_email_sender,
         )
         .await
     });
 
     let pool_clone = connection_pool.clone();
-    tokio::spawn(
-        async move { data_persistance_handler(persistant_data_receiver, pool_clone).await },
-    );
+    tokio::spawn(async move {
+        data_persistance_handler(persistant_data_receiver, persistant_data_sender, pool_clone).await
+    });
 
     run(
         listener,

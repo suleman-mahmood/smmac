@@ -1,5 +1,7 @@
+use std::{error::Error, time::Duration};
+
 use sqlx::{Acquire, PgPool};
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     dal::{data_extract_db, email_db, google_webpage_db, html_tag_db},
@@ -55,6 +57,7 @@ pub struct FounderPageData {
 
 pub async fn data_persistance_handler(
     mut data_receiver: UnboundedReceiver<PersistantData>,
+    persistant_data_sender: UnboundedSender<PersistantData>,
     pool: PgPool,
 ) {
     log::info!("Started data persistance handler");
@@ -66,7 +69,21 @@ pub async fn data_persistance_handler(
         );
 
         // TODO: Make sure that it can live long enough
-        let mut pool_con = pool.acquire().await.unwrap();
+        let pool_con_result = pool.acquire().await;
+        if let Err(e) = pool_con_result {
+            log::error!("Pool timed out: {:?}", e);
+            tokio::time::sleep(Duration::from_secs(10)).await;
+
+            if let Err(e) = persistant_data_sender.send(data) {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
+            }
+            continue;
+        }
+        let mut pool_con = pool_con_result.unwrap();
         let con = pool_con.acquire().await.unwrap();
 
         match data {
