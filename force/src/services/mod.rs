@@ -6,6 +6,7 @@ pub mod founder_scraper;
 pub mod google_scraper;
 pub mod openai_client;
 pub mod sentinel;
+pub mod smart_scout_scraper;
 
 pub use data_persistance::*;
 pub use domain_scraper::*;
@@ -15,3 +16,4 @@ pub use founder_scraper::*;
 pub use google_scraper::*;
 pub use openai_client::*;
 pub use sentinel::*;
+pub use smart_scout_scraper::*;

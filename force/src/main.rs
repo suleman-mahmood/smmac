@@ -7,8 +7,8 @@ use force::{
     domain::email::FounderDomainEmail,
     services::{
         data_persistance_handler, domain_scraper_handler, email_verified_handler,
-        founder_scraper_handler, FounderQueryChannelData, OpenaiClient, PersistantData,
-        ProductQuerySender, Sentinel, VerifiedEmailReceiver,
+        founder_scraper_handler, smart_scout_scraper_handler, FounderQueryChannelData,
+        OpenaiClient, PersistantData, ProductQuerySender, Sentinel, VerifiedEmailReceiver,
     },
     startup::run,
 };
@@ -87,6 +87,9 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(async move {
         data_persistance_handler(persistant_data_receiver, persistant_data_sender, pool_clone).await
     });
+
+    let pool_clone = connection_pool.clone();
+    tokio::spawn(async move { smart_scout_scraper_handler(pool_clone).await });
 
     run(
         listener,

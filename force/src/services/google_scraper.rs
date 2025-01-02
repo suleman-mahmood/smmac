@@ -12,6 +12,7 @@ const NUM_CAPTCHA_RETRIES: u8 = 10; // Should be > 0
 pub enum GoogleSearchType {
     Domain(Option<String>),
     Founder(String),
+    CompanyName,
 }
 
 pub enum GoogleSearchResult {
@@ -22,6 +23,10 @@ pub enum GoogleSearchResult {
         page_source: String,
     },
     Founders(FounderTagCandidate, String),
+    CompanyNames {
+        name_candidates: Vec<HtmlTag>,
+        page_source: String,
+    },
     CaptchaBlocked,
 }
 
@@ -62,6 +67,7 @@ pub async fn extract_data_from_google_search_with_reqwest(
             _ => client.get(GOOGLE_URL).query(&query),
         };
 
+        // TODO: Missleading info log because of next page
         log::info!("Sending reqwest for query: {}", query.q);
 
         match req.send().await {
@@ -135,6 +141,16 @@ pub async fn extract_data_from_google_search_with_reqwest(
                                 },
                                 html_content,
                             );
+                        }
+                        GoogleSearchType::CompanyName => {
+                            log::info!("Found {} h3_tags| Potential company names", headings.len(),);
+
+                            let elements = headings.into_iter().map(HtmlTag::H3Tag).collect();
+
+                            return GoogleSearchResult::CompanyNames {
+                                name_candidates: elements,
+                                page_source: html_content,
+                            };
                         }
                     },
                 }

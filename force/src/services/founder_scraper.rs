@@ -78,8 +78,8 @@ async fn scrape_founder_query(
                 );
             }
         }
-        GoogleSearchResult::Domains { .. } => {
-            log::error!("Returning domains from founder google search");
+        GoogleSearchResult::Domains { .. } | GoogleSearchResult::CompanyNames { .. } => {
+            log::error!("Returning domains or company names from founder google search");
         }
         GoogleSearchResult::Founders(tag_candidate, page_source) => {
             let founder_names: Vec<Option<String>> = tag_candidate

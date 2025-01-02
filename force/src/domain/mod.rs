@@ -4,3 +4,4 @@ pub mod email;
 pub mod google_webpage;
 pub mod html_tag;
 pub mod niche;
+pub mod smart_scout;

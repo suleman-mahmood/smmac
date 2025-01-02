@@ -76,8 +76,8 @@ async fn scrape_domain_query(
                 not_found = true;
                 break;
             }
-            GoogleSearchResult::Founders(..) => {
-                log::error!("Returning founders from domain google search");
+            GoogleSearchResult::Founders(..) | GoogleSearchResult::CompanyNames { .. } => {
+                log::error!("Returning founders or company names from domain google search");
                 break;
             }
             GoogleSearchResult::Domains {
