@@ -100,6 +100,6 @@ pub fn extract_domain(tag: HtmlTag) -> Option<String> {
     }
 }
 
-pub fn extract_company_name(tag: HtmlTag) -> Option<String> {
+pub fn extract_company_name(tag: Vec<HtmlTag>) -> String {
     todo!()
 }

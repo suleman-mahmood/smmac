@@ -7,6 +7,7 @@ use crate::domain::data_extract::DataExtract;
 enum DataType {
     Domain,
     FounderName,
+    CompanyName,
 }
 
 pub async fn insert_data(
@@ -17,6 +18,7 @@ pub async fn insert_data(
     let (content, data_type) = match data {
         DataExtract::Domain(content) => (content, DataType::Domain),
         DataExtract::FounderName(content) => (content, DataType::FounderName),
+        DataExtract::CompanyName(content) => (content, DataType::CompanyName),
     };
 
     sqlx::query_scalar!(

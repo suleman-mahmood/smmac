@@ -1,20 +1,26 @@
-use std::time::Duration;
+use std::{error::Error, time::Duration};
 
 use sqlx::{Acquire, PgPool};
-use tokio::time;
+use tokio::{sync::mpsc::UnboundedSender, time};
 
 use crate::{
     dal::smart_scout_db,
     domain::{html_tag::extract_company_name, smart_scout::SmartScout},
     routes::lead_route::build_company_name_search_query,
     services::{
-        extract_data_from_google_search_with_reqwest, GoogleSearchResult, GoogleSearchType,
+        extract_data_from_google_search_with_reqwest, CompanyNameData, GoogleSearchResult,
+        GoogleSearchType,
     },
 };
 
+use super::PersistantData;
+
 const N: i64 = 10;
 
-pub async fn smart_scout_scraper_handler(pool: PgPool) {
+pub async fn smart_scout_scraper_handler(
+    pool: PgPool,
+    persistant_data_sender: UnboundedSender<PersistantData>,
+) {
     log::info!("Started smart scout scraper");
 
     // Create a 30 min interval
@@ -44,12 +50,18 @@ pub async fn smart_scout_scraper_handler(pool: PgPool) {
 
         for ss in ss_companies {
             smart_scout_db::start_job(con, ss.id).await.unwrap();
-            tokio::spawn(scrape_company_domain_query(ss));
+            tokio::spawn(scrape_company_domain_query(
+                ss,
+                persistant_data_sender.clone(),
+            ));
         }
     }
 }
 
-async fn scrape_company_domain_query(ss: SmartScout) {
+async fn scrape_company_domain_query(
+    ss: SmartScout,
+    persistant_data_sender: UnboundedSender<PersistantData>,
+) {
     log::info!(
         "Scraping google for company domain for company: {}",
         ss.name
@@ -69,19 +81,39 @@ async fn scrape_company_domain_query(ss: SmartScout) {
             log::error!("Returning from captcha blocked on url {}", query);
         }
         GoogleSearchResult::NotFound => {
-            todo!();
+            if let Err(e) = persistant_data_sender.send(PersistantData::CompanyName(
+                CompanyNameData::NoResult { query },
+            )) {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
+            }
         }
         GoogleSearchResult::CompanyNames {
             name_candidates,
             page_source,
         } => {
-            let company_names: Vec<Option<String>> = name_candidates
-                .into_iter()
-                .map(|tag| extract_company_name(tag))
-                .collect();
+            let company_name = extract_company_name(name_candidates.clone());
 
             // TODO: Add logic to transfer data to further channels
-            // TODO: Add data persistance logic
+
+            if let Err(e) =
+                persistant_data_sender.send(PersistantData::CompanyName(CompanyNameData::Result {
+                    query,
+                    page_source,
+                    page_number: 1,
+                    html_tags: name_candidates,
+                    company_name,
+                }))
+            {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
+            }
         }
     }
 }

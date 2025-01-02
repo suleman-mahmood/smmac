@@ -84,12 +84,15 @@ async fn main() -> std::io::Result<()> {
     });
 
     let pool_clone = connection_pool.clone();
+    let pers_data_clone = persistant_data_sender.clone();
     tokio::spawn(async move {
-        data_persistance_handler(persistant_data_receiver, persistant_data_sender, pool_clone).await
+        data_persistance_handler(persistant_data_receiver, pers_data_clone, pool_clone).await
     });
 
     let pool_clone = connection_pool.clone();
-    tokio::spawn(async move { smart_scout_scraper_handler(pool_clone).await });
+    tokio::spawn(
+        async move { smart_scout_scraper_handler(pool_clone, persistant_data_sender).await },
+    );
 
     run(
         listener,
