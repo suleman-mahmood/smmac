@@ -1609,6 +1609,7 @@ dependencies = [
  "serde-aux",
  "serde_json",
  "sqlx",
+ "strsim 0.11.1",
  "thirtyfour",
  "tokio",
  "url",

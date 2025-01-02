@@ -1,3 +1,4 @@
+use strsim::jaro_winkler;
 use url::Url;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -100,6 +101,43 @@ pub fn extract_domain(tag: HtmlTag) -> Option<String> {
     }
 }
 
-pub fn extract_company_name(tag: Vec<HtmlTag>) -> String {
-    todo!()
+pub fn extract_company_domain(company_name: &str, tags: Vec<HtmlTag>) -> String {
+    let data: Vec<String> = tags
+        .into_iter()
+        .filter_map(|tag| {
+            if let HtmlTag::ATag(content) = tag {
+                Some(content)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    data.into_iter()
+        .max_by(|a, b| {
+            jaro_winkler(company_name, a)
+                .partial_cmp(&jaro_winkler(company_name, b))
+                .unwrap()
+        })
+        .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extract_company_domain, HtmlTag};
+
+    #[test]
+    fn extract_company_domain_valid() {
+        let company_name = "Google Company";
+        let tags = vec![
+            HtmlTag::ATag("friends.com".to_string()),
+            HtmlTag::ATag("goog.com".to_string()),
+            HtmlTag::ATag("google.com".to_string()),
+            HtmlTag::ATag("google.us".to_string()),
+            HtmlTag::ATag("fb.pk".to_string()),
+        ];
+        let result = extract_company_domain(company_name, tags);
+
+        assert_eq!(result, "google.com");
+    }
 }
