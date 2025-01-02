@@ -5,7 +5,10 @@ use tokio::{sync::mpsc::UnboundedSender, time};
 
 use crate::{
     dal::smart_scout_db,
-    domain::{html_tag::extract_company_domain, smart_scout::SmartScout},
+    domain::{
+        html_tag::{extract_company_domain, extract_domain},
+        smart_scout::SmartScout,
+    },
     routes::lead_route::{
         build_company_name_search_query, build_founder_seach_queries, BLACK_LIST_DOMAINS,
     },
@@ -100,7 +103,13 @@ async fn scrape_company_domain_query(
             name_candidates,
             page_source,
         } => {
-            let company_name = extract_company_domain(&ss.name, name_candidates.clone());
+            let domains: Vec<String> = name_candidates
+                .clone()
+                .into_iter()
+                .filter_map(|nc| extract_domain(nc))
+                .collect();
+
+            let company_name = extract_company_domain(&ss.name, domains.clone());
 
             if !BLACK_LIST_DOMAINS
                 .iter()

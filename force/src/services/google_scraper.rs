@@ -143,12 +143,17 @@ pub async fn extract_data_from_google_search_with_reqwest(
                             );
                         }
                         GoogleSearchType::CompanyName => {
-                            log::info!("Found {} h3_tags| Potential company names", headings.len(),);
+                            log::info!("Found {} a_tags| Potential company names", headings.len(),);
 
-                            let elements = headings.into_iter().map(HtmlTag::H3Tag).collect();
+                            let links: Vec<String> = html_document
+                                .select(&a_tag_selector)
+                                .filter_map(|tag| {
+                                    tag.value().attr("href").map(|url| url.to_string())
+                                })
+                                .collect();
 
                             return GoogleSearchResult::CompanyNames {
-                                name_candidates: elements,
+                                name_candidates: links.into_iter().map(HtmlTag::ATag).collect(),
                                 page_source: html_content,
                             };
                         }
