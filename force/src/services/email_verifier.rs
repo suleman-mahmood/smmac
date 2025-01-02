@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
 use actix_web::web::Data;
 use check_if_email_exists::Reachable;
@@ -62,10 +62,16 @@ async fn verify_email(
     let reachable = sentinel.get_email_verification_status(&email.email).await;
     match reachable {
         Reachable::Safe => {
-            persistant_data_sender
-                .send(PersistantData::UpdateEmailVerified(email.email.clone()))
-                .unwrap();
-            verified_email_sender.send(email.email).unwrap();
+            verified_email_sender.send(email.email.clone()).unwrap();
+            if let Err(e) =
+                persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
+            {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
+            }
         }
         _ => {}
     };

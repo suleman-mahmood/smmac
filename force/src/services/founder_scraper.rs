@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -66,11 +66,17 @@ async fn scrape_founder_query(
 
     match google_search_result {
         GoogleSearchResult::NotFound => {
-            persistant_data_sender
-                .send(PersistantData::Founder(FounderData::NoResult {
+            if let Err(e) =
+                persistant_data_sender.send(PersistantData::Founder(FounderData::NoResult {
                     query: data.query,
                 }))
-                .unwrap();
+            {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
+            }
         }
         GoogleSearchResult::Domains { .. } => {
             log::error!("Returning domains from founder google search");
@@ -93,9 +99,14 @@ async fn scrape_founder_query(
 
             for em in emails {
                 email_sender.send(em.clone()).unwrap();
-                persistant_data_sender
-                    .send(PersistantData::Email(em))
-                    .unwrap();
+
+                if let Err(e) = persistant_data_sender.send(PersistantData::Email(em)) {
+                    log::error!(
+                        "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                        e,
+                        e.source(),
+                    );
+                }
             }
             let page_data = FounderPageData {
                 page_source: page_source.clone(),
@@ -104,12 +115,18 @@ async fn scrape_founder_query(
                 founder_names: founder_names.clone(),
             };
 
-            persistant_data_sender
-                .send(PersistantData::Founder(FounderData::Result {
+            if let Err(e) =
+                persistant_data_sender.send(PersistantData::Founder(FounderData::Result {
                     query: data.query,
                     page_data,
                 }))
-                .unwrap();
+            {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
+            }
         }
         GoogleSearchResult::CaptchaBlocked => {
             log::error!("Returning from captcha blocked on url {}", data.query);

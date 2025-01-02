@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
 const PAGE_DEPTH: u8 = 1;
 const SET_RESET_LEN: usize = 10_000;
@@ -130,11 +130,23 @@ async fn scrape_domain_query(
     not_found = pages_data.is_empty() && not_found;
 
     if not_found {
-        persistant_data_sender
-            .send(PersistantData::Domain(DomainData::NoResult { query }))
-            .unwrap();
+        if let Err(e) =
+            persistant_data_sender.send(PersistantData::Domain(DomainData::NoResult { query }))
+        {
+            log::error!(
+                "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
+        }
     } else {
         let data = PersistantData::Domain(DomainData::Result { query, pages_data });
-        persistant_data_sender.send(data).unwrap();
+        if let Err(e) = persistant_data_sender.send(data) {
+            log::error!(
+                "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
+        }
     }
 }
