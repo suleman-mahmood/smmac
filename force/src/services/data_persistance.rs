@@ -4,7 +4,10 @@ use sqlx::{Acquire, PgPool};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
-    dal::{data_extract_db, email_db, google_webpage_db, html_tag_db},
+    dal::{
+        data_extract_db, email_db, google_webpage_db, html_tag_db,
+        smart_scout_db::{self, SmartScoutJobStatus},
+    },
     domain::{
         data_extract::DataExtract,
         email::{Email, FounderDomainEmail, Reachability, VerificationStatus},
@@ -16,8 +19,10 @@ use crate::{
 pub enum PersistantData {
     Domain(DomainData),
     Founder(FounderData),
+    CompanyName(CompanyNameData),
     Email(FounderDomainEmail),
     UpdateEmailVerified(String),
+    CompleteSmartScoutJob(i64),
 }
 
 pub enum DomainData {
@@ -42,6 +47,19 @@ pub enum FounderData {
     Result {
         query: String,
         page_data: FounderPageData,
+    },
+    NoResult {
+        query: String,
+    },
+}
+
+pub enum CompanyNameData {
+    Result {
+        query: String,
+        page_source: String,
+        page_number: u8,
+        html_tags: Vec<HtmlTag>,
+        company_name: String,
     },
     NoResult {
         query: String,
@@ -197,8 +215,71 @@ pub async fn data_persistance_handler(
                 }
             }
             PersistantData::UpdateEmailVerified(email) => {
-                _ = email_db::update_email_verified(con, email).await;
+                if let Err(e) = email_db::update_email_verified(con, email).await {
+                    log::error!("Error while persisting email verified status: {:?}", e);
+                }
             }
+            PersistantData::CompleteSmartScoutJob(smart_scout_id) => {
+                if let Err(e) =
+                    smart_scout_db::finish_job(con, smart_scout_id, SmartScoutJobStatus::Completed)
+                        .await
+                {
+                    log::error!(
+                        "Error while persisting smart scout job completion status: {:?}",
+                        e
+                    );
+                }
+            }
+            PersistantData::CompanyName(data) => match data {
+                CompanyNameData::NoResult { query } => {
+                    let webpage = GoogleWebPage {
+                        search_query: query.clone(),
+                        page_source: "".to_string(),
+                        page_number: 0,
+                        data_extraction_intent: DataExtractionIntent::CompanyName,
+                        any_result: false,
+                    };
+
+                    google_webpage_db::insert_web_page(con, webpage)
+                        .await
+                        .unwrap();
+                }
+                CompanyNameData::Result {
+                    query,
+                    page_source,
+                    page_number,
+                    company_name,
+                    html_tags,
+                } => {
+                    let webpage = GoogleWebPage {
+                        search_query: query.clone(),
+                        page_source,
+                        page_number,
+                        data_extraction_intent: DataExtractionIntent::CompanyName,
+                        any_result: true,
+                    };
+
+                    let web_page_id = google_webpage_db::insert_web_page(con, webpage)
+                        .await
+                        .unwrap();
+
+                    for (i, tag) in html_tags.into_iter().enumerate() {
+                        let tag_id = html_tag_db::insert_html_tag(con, tag, web_page_id)
+                            .await
+                            .unwrap();
+
+                        if i == 0 {
+                            data_extract_db::insert_data(
+                                con,
+                                DataExtract::CompanyName(company_name.clone()),
+                                tag_id,
+                            )
+                            .await
+                            .unwrap();
+                        }
+                    }
+                }
+            },
         }
     }
 }

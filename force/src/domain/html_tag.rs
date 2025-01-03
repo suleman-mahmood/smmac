@@ -1,3 +1,4 @@
+use strsim::jaro_winkler;
 use url::Url;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -42,7 +43,7 @@ pub fn extract_founder_name(tag: HtmlTag) -> Option<String> {
              5. Split by "|" and get content before the split
             */
             let strategies = [
-                "'s Post -",
+                // "'s Post -",
                 "posted on",
                 "on LinkedIn",
                 "en LinkedIn",
@@ -97,5 +98,35 @@ pub fn extract_domain(tag: HtmlTag) -> Option<String> {
             None => None,
         },
         _ => None,
+    }
+}
+
+pub fn extract_company_domain(company_name: &str, tags: Vec<String>) -> String {
+    tags.into_iter()
+        .max_by(|a, b| {
+            jaro_winkler(company_name, a)
+                .partial_cmp(&jaro_winkler(company_name, b))
+                .unwrap()
+        })
+        .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_company_domain;
+
+    #[test]
+    fn extract_company_domain_valid() {
+        let company_name = "Google Company";
+        let tags = vec![
+            "friends.com".to_string(),
+            "goog.com".to_string(),
+            "google.com".to_string(),
+            "google.us".to_string(),
+            "fb.pk".to_string(),
+        ];
+        let result = extract_company_domain(company_name, tags);
+
+        assert_eq!(result, "google.com");
     }
 }

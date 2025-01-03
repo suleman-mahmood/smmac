@@ -187,8 +187,11 @@ async fn save_urls_from_google_searche_batch(
                             not_found = true;
                             break;
                         }
-                        GoogleSearchResult::Founders(..) => {
-                            log::error!("Returning founders from domain google search");
+                        GoogleSearchResult::Founders(..)
+                        | GoogleSearchResult::CompanyNames { .. } => {
+                            log::error!(
+                                "Returning founders or company names from domain google search"
+                            );
                             break;
                         }
                         GoogleSearchResult::Domains {
@@ -301,8 +304,11 @@ async fn save_founders_from_google_searches_batch(pool: &PgPool, domains: Vec<St
 
                 match google_search_result {
                     GoogleSearchResult::NotFound => FounderThreadResult::NotFounder(domain),
-                    GoogleSearchResult::Domains { .. } => {
-                        log::error!("Returning domains from founder google search");
+                    GoogleSearchResult::Domains { .. }
+                    | GoogleSearchResult::CompanyNames { .. } => {
+                        log::error!(
+                            "Returning domains or company names from founder google search"
+                        );
                         FounderThreadResult::Ignore
                     }
                     GoogleSearchResult::Founders(tag_candidate, page_source) => {
@@ -367,6 +373,10 @@ pub fn build_founder_seach_queries(domain: &str) -> Vec<String> {
         .into_iter()
         .map(|t| format!(r#"site:linkedin.com "{}" AND "{}""#, domain, t))
         .collect()
+}
+
+pub fn build_company_name_search_query(name: &str) -> String {
+    name.to_lowercase()
 }
 
 #[derive(Clone)]

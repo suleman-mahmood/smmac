@@ -7,8 +7,8 @@ use force::{
     domain::email::FounderDomainEmail,
     services::{
         data_persistance_handler, domain_scraper_handler, email_verified_handler,
-        founder_scraper_handler, FounderQueryChannelData, OpenaiClient, PersistantData,
-        ProductQuerySender, Sentinel, VerifiedEmailReceiver,
+        founder_scraper_handler, smart_scout_scraper_handler, FounderQueryChannelData,
+        OpenaiClient, PersistantData, ProductQuerySender, Sentinel, VerifiedEmailReceiver,
     },
     startup::run,
 };
@@ -57,13 +57,9 @@ async fn main() -> std::io::Result<()> {
 
     // Spawn backgound tasks
     let pers_data_clone = persistant_data_sender.clone();
+    let fou_q_clone = founder_query_sender.clone();
     tokio::spawn(async move {
-        domain_scraper_handler(
-            product_query_receiver,
-            founder_query_sender,
-            pers_data_clone,
-        )
-        .await
+        domain_scraper_handler(product_query_receiver, fou_q_clone, pers_data_clone).await
     });
 
     let pers_data_clone = persistant_data_sender.clone();
@@ -84,8 +80,14 @@ async fn main() -> std::io::Result<()> {
     });
 
     let pool_clone = connection_pool.clone();
+    let pers_data_clone = persistant_data_sender.clone();
     tokio::spawn(async move {
-        data_persistance_handler(persistant_data_receiver, persistant_data_sender, pool_clone).await
+        data_persistance_handler(persistant_data_receiver, pers_data_clone, pool_clone).await
+    });
+
+    let pool_clone = connection_pool.clone();
+    tokio::spawn(async move {
+        smart_scout_scraper_handler(pool_clone, founder_query_sender, persistant_data_sender).await
     });
 
     run(
