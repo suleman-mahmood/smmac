@@ -43,7 +43,7 @@ pub fn extract_founder_name(tag: HtmlTag) -> Option<String> {
              5. Split by "|" and get content before the split
             */
             let strategies = [
-                "'s Post -",
+                // "'s Post -",
                 "posted on",
                 "on LinkedIn",
                 "en LinkedIn",

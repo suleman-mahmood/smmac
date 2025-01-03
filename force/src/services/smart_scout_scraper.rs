@@ -18,7 +18,7 @@ use crate::{
 
 use super::{FounderQueryChannelData, PersistantData};
 
-const N: i64 = 1;
+const N: i64 = 10;
 
 pub async fn smart_scout_scraper_handler(
     pool: PgPool,
