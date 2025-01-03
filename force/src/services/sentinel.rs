@@ -93,7 +93,8 @@ impl Sentinel {
         let mut input = CheckEmailInput::new(email.to_string());
         input
             .set_from_email("random.guy@fit.com".to_string())
-            .set_hello_name("verywellfit.com".to_string());
+            .set_hello_name("verywellfit.com".to_string())
+            .set_smtp_security(check_if_email_exists::SmtpSecurity::Wrapper);
 
         // Verify this email, using async/await syntax.
         let result = check_email(&input).await;
