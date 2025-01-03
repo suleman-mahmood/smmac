@@ -376,7 +376,7 @@ pub fn build_founder_seach_queries(domain: &str) -> Vec<String> {
 }
 
 pub fn build_company_name_search_query(name: &str) -> String {
-    todo!()
+    name.to_lowercase()
 }
 
 #[derive(Clone)]
