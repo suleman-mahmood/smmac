@@ -9,9 +9,7 @@ use crate::{
         html_tag::{extract_company_domain, extract_domain},
         smart_scout::SmartScout,
     },
-    routes::lead_route::{
-        build_company_name_search_query, build_founder_seach_queries, BLACK_LIST_DOMAINS,
-    },
+    routes::lead_route::{build_company_name_search_query, build_founder_seach_queries},
     services::{
         extract_data_from_google_search_with_reqwest, CompanyNameData, GoogleSearchResult,
         GoogleSearchType,
@@ -111,21 +109,17 @@ async fn scrape_company_domain_query(
 
             let company_name = extract_company_domain(&ss.name, domains.clone());
 
-            if !BLACK_LIST_DOMAINS
-                .iter()
-                .any(|&blacklist| company_name.contains(blacklist))
-            {
-                for query in build_founder_seach_queries(&company_name) {
-                    founder_query_sender
-                        .send(FounderQueryChannelData {
-                            query,
-                            domain: company_name.clone(),
-                        })
-                        .unwrap();
-                }
+            for query in build_founder_seach_queries(&company_name) {
+                founder_query_sender
+                    .send(FounderQueryChannelData {
+                        query,
+                        domain: company_name.clone(),
+                    })
+                    .unwrap();
             }
 
-            if let Err(e) = persistant_data_sender.send(PersistantData::UpdateSmartScoutJob(ss.id))
+            if let Err(e) =
+                persistant_data_sender.send(PersistantData::CompleteSmartScoutJob(ss.id))
             {
                 log::error!(
                     "Persistant data sender channel got an Error: {:?} | Source: {:?}",
