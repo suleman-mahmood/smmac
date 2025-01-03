@@ -1,4 +1,4 @@
-use check_if_email_exists::{check_email, CheckEmailInput, Reachable};
+use check_if_email_exists::{check_email, CheckEmailInput, CheckEmailOutput, Reachable};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -101,5 +101,17 @@ impl Sentinel {
         log::info!("{} verification result {:?}", email, result);
 
         result.is_reachable
+    }
+
+    pub async fn get_email_info(&self, email: &str) -> CheckEmailOutput {
+        let mut input = CheckEmailInput::new(email.to_string());
+        input
+            .set_from_email("random.guy@fit.com".to_string())
+            .set_hello_name("verywellfit.com".to_string());
+
+        // Verify this email, using async/await syntax.
+        let result = check_email(&input).await;
+
+        result
     }
 }

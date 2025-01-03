@@ -2,6 +2,7 @@ use core::f64;
 use std::u16;
 
 use actix_web::{get, web, HttpResponse};
+use lettre::transport::smtp::{client::SmtpConnection, extension::ClientId};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -441,11 +442,53 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
         "sulemanmahmood9988347@gmail.com".to_string(),
     ];
 
-    let mut result = Vec::new();
-
     for em in emails {
-        result.push(sentinel.get_email_verification_status(&em).await);
+        // CheckEmailOutput input: "sulemanmahmood99@gmail.com", is_reachable: Safe, misc: Ok(MiscDetails { is_disposable: false, is_role_account: false, gravatar_url: None, haveibeenpwned: None }),
+        //   mx: Ok(MxDetails { lookup: Ok(MxLookup(Lookup { query: Query { name: Name("gmail.com"), query_type: MX, query_class: IN },
+        //     records: [
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 30, exchange: Name("alt3.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 10, exchange: Name("alt1.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 20, exchange: Name("alt2.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 40, exchange: Name("alt4.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 5, exchange: Name("gmail-smtp-in.l.google.com.") })) }
+        //     ],
+        //     valid_until: Instant { tv_sec: 6077130, tv_nsec: 595604176 } })) })
+
+        let email_output = sentinel.get_email_info(&em).await;
+        let exchanges: Vec<String> = email_output
+            .mx
+            .unwrap()
+            .lookup
+            .unwrap()
+            .iter()
+            .map(|rdata| rdata.exchange().to_string())
+            .collect();
+
+        let smtp_server = exchanges.first().unwrap();
+
+        // Perform an SMTP handshake
+        let mut smtp_connection = SmtpConnection::connect(
+            smtp_server,
+            None,
+            &ClientId::Domain("verwellfit.com".to_string()),
+            None,
+            None,
+        )
+        .unwrap();
+
+        smtp_connection
+            .command(format!("MAIL FROM:<noreply@yourdomain.com>"))
+            .unwrap();
+        let response = smtp_connection
+            .command(format!("RCPT TO:<{}>", em))
+            .unwrap();
+        smtp_connection.quit().unwrap();
+
+        log::info!("How is the response? {:?}", response.code().is_positive());
+        log::info!("Codee: {:?}", response.code());
+
+        log::info!("Got exchangese: {:?}", exchanges);
     }
 
-    HttpResponse::Ok().json(result)
+    HttpResponse::Ok().body("Done!")
 }
