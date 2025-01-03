@@ -74,7 +74,7 @@ pub async fn get_n_unscraped_company_ids(
             join unscraped_ids ui on ui.public_id = ss.public_id
         where
             ss.name is not null
-        order by random()
+        order by ss.estimatesales desc
         limit $1
         ",
         n,
