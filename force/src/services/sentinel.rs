@@ -98,6 +98,8 @@ impl Sentinel {
         // Verify this email, using async/await syntax.
         let result = check_email(&input).await;
 
+        log::info!("{} verification result {:?}", email, result);
+
         result.is_reachable
     }
 }
