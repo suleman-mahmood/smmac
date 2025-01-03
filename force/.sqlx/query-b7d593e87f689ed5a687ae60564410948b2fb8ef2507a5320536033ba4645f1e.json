@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        with unscraped_ids as (\n            select\n                distinct public_id\n            from\n                smart_scout\n\n            except\n\n            select\n                distinct ss.public_id\n            from\n                smart_scout ss\n                join smart_scout_job ssj on ssj.smart_scout_id = ss.id\n        )\n        select\n            ss.id,\n            ss.name\n        from\n            smart_scout ss\n            join unscraped_ids ui on ui.public_id = ss.public_id\n        where\n            ss.name is not null\n        order by random()\n        limit $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "b7d593e87f689ed5a687ae60564410948b2fb8ef2507a5320536033ba4645f1e"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into smart_scout_job\n            (smart_scout_id, status)\n        values\n            ($1, 'STARTED')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "095c62af44981afd7e7a512fd64c329d137a4f81132422f392368ea70a5d79f9"
+}

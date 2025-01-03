@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        update smart_scout_job set\n            status = $2\n        where\n            smart_scout_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        {
+          "Custom": {
+            "name": "smartscoutjobstatus",
+            "kind": {
+              "Enum": [
+                "STARTED",
+                "COMPLETED",
+                "FAILED"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "feb6e6f224ac3808037762f7035404a6aa194d4763403743e363549bcbac29ac"
+}

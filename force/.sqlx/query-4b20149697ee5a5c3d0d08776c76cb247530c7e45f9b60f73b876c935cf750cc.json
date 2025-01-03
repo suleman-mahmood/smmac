@@ -18,7 +18,8 @@
             "kind": {
               "Enum": [
                 "DOMAIN",
-                "FOUNDER_NAME"
+                "FOUNDER_NAME",
+                "COMPANY_NAME"
               ]
             }
           }
