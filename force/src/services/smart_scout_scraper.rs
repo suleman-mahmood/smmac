@@ -20,7 +20,7 @@ use crate::{
 
 use super::{FounderQueryChannelData, PersistantData};
 
-const N: i64 = 10;
+const N: i64 = 1;
 
 pub async fn smart_scout_scraper_handler(
     pool: PgPool,
@@ -123,6 +123,15 @@ async fn scrape_company_domain_query(
                         })
                         .unwrap();
                 }
+            }
+
+            if let Err(e) = persistant_data_sender.send(PersistantData::UpdateSmartScoutJob(ss.id))
+            {
+                log::error!(
+                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                    e,
+                    e.source(),
+                );
             }
 
             if let Err(e) =

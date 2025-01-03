@@ -4,7 +4,10 @@ use sqlx::{Acquire, PgPool};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
-    dal::{data_extract_db, email_db, google_webpage_db, html_tag_db},
+    dal::{
+        data_extract_db, email_db, google_webpage_db, html_tag_db,
+        smart_scout_db::{self, SmartScoutJobStatus},
+    },
     domain::{
         data_extract::DataExtract,
         email::{Email, FounderDomainEmail, Reachability, VerificationStatus},
@@ -19,6 +22,7 @@ pub enum PersistantData {
     CompanyName(CompanyNameData),
     Email(FounderDomainEmail),
     UpdateEmailVerified(String),
+    UpdateSmartScoutJob(i64),
 }
 
 pub enum DomainData {
@@ -211,7 +215,20 @@ pub async fn data_persistance_handler(
                 }
             }
             PersistantData::UpdateEmailVerified(email) => {
-                _ = email_db::update_email_verified(con, email).await;
+                if let Err(e) = email_db::update_email_verified(con, email).await {
+                    log::error!("Error while persisting email verified status: {:?}", e);
+                }
+            }
+            PersistantData::UpdateSmartScoutJob(smart_scout_id) => {
+                if let Err(e) =
+                    smart_scout_db::finish_job(con, smart_scout_id, SmartScoutJobStatus::Completed)
+                        .await
+                {
+                    log::error!(
+                        "Error while persisting smart scout job completion status: {:?}",
+                        e
+                    );
+                }
             }
             PersistantData::CompanyName(data) => match data {
                 CompanyNameData::NoResult { query } => {
