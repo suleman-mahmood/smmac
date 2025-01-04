@@ -464,6 +464,7 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
         log::info!("Got exchangese: {:?}", exchanges);
 
         let smtp_server = exchanges.first().unwrap();
+        let smtp_server = smtp_server.trim_end_matches(".");
 
         // Perform an SMTP handshake
         let mut smtp_connection = SmtpConnection::connect(
