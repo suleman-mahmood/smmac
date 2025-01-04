@@ -1,6 +1,3 @@
-use core::f64;
-use std::u16;
-
 use actix_web::{get, web, HttpResponse};
 use lettre::transport::smtp::{client::SmtpConnection, extension::ClientId};
 use reqwest::Client;
@@ -428,18 +425,18 @@ async fn scrape_smart_scout(pool: web::Data<PgPool>) -> HttpResponse {
 async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
     let emails: Vec<String> = vec![
         "wbush@nimble.com".to_string(),
-        "wesb@nimble.com".to_string(),
-        "bush@nimble.com".to_string(),
-        "wes@nimble.com".to_string(),
-        "andresp@nimble.com".to_string(),
-        "johnk@nimble.com".to_string(),
-        "johnkostoulas@nimble.com".to_string(),
-        "john@nimble.com".to_string(),
-        "awallace@nimble.com".to_string(),
-        "alanw@nimble.com".to_string(),
-        "suleman@mazlo.com".to_string(),
+        // "wesb@nimble.com".to_string(),
+        // "bush@nimble.com".to_string(),
+        // "wes@nimble.com".to_string(),
+        // "andresp@nimble.com".to_string(),
+        // "johnk@nimble.com".to_string(),
+        // "johnkostoulas@nimble.com".to_string(),
+        // "john@nimble.com".to_string(),
+        // "awallace@nimble.com".to_string(),
+        // "alanw@nimble.com".to_string(),
+        // "sulemanmahmood9988347@gmail.com".to_string(),
+        // "suleman@mazlo.com".to_string(),
         "sulemanmahmood99@gmail.com".to_string(),
-        "sulemanmahmood9988347@gmail.com".to_string(),
     ];
 
     for em in emails {
@@ -464,11 +461,13 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
             .map(|rdata| rdata.exchange().to_string())
             .collect();
 
+        log::info!("Got exchangese: {:?}", exchanges);
+
         let smtp_server = exchanges.first().unwrap();
 
         // Perform an SMTP handshake
         let mut smtp_connection = SmtpConnection::connect(
-            smtp_server,
+            format!("{}:25", smtp_server),
             None,
             &ClientId::Domain("verwellfit.com".to_string()),
             None,
@@ -476,18 +475,23 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
         )
         .unwrap();
 
-        smtp_connection
+        log::info!("Got ehlo response: {:?}", smtp_connection.read_response());
+
+        let response = smtp_connection
             .command(format!("MAIL FROM:<noreply@yourdomain.com>"))
             .unwrap();
+        log::info!("How is the response? {:?}", response.code().is_positive());
+        log::info!("Code: {:?}", response.code());
+        log::info!("Response: {:?}", response);
+
         let response = smtp_connection
             .command(format!("RCPT TO:<{}>", em))
             .unwrap();
         smtp_connection.quit().unwrap();
 
         log::info!("How is the response? {:?}", response.code().is_positive());
-        log::info!("Codee: {:?}", response.code());
-
-        log::info!("Got exchangese: {:?}", exchanges);
+        log::info!("Code: {:?}", response.code());
+        log::info!("Response: {:?}", response);
     }
 
     HttpResponse::Ok().body("Done!")
