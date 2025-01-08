@@ -133,16 +133,21 @@ impl Sentinel {
         //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 5, exchange: Name("gmail-smtp-in.l.google.com.") })) }
         //     ],
         //     valid_until: Instant { tv_sec: 6077130, tv_nsec: 595604176 } })) })
-        let exchanges: Vec<String> = dns_info
-            .mx
-            .unwrap()
-            .lookup
-            .unwrap()
+        let Ok(mx) = dns_info.mx else {
+            return false;
+        };
+        let Ok(lookup) = mx.lookup else {
+            return false;
+        };
+        let exchanges: Vec<String> = lookup
             .iter()
             .map(|rdata| rdata.exchange().to_string())
             .collect();
 
-        let smtp_server = exchanges.first().unwrap();
+        let Some(first_exchange) = exchanges.first() else {
+            return false;
+        };
+        let smtp_server = first_exchange;
         let smtp_server = smtp_server.trim_end_matches(".");
         let smtp_server_port = format!("{}:25", smtp_server);
 
@@ -150,25 +155,33 @@ impl Sentinel {
         trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
         impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 
-        let stream = TcpStream::connect(smtp_server_port).await.unwrap();
+        let Ok(stream) = TcpStream::connect(smtp_server_port).await else {
+            return false;
+        };
         let stream = BufStream::new(Box::new(stream) as Box<dyn AsyncReadWrite>);
         let client = SmtpClient::new();
-        let mut transport = SmtpTransport::new(client, stream).await.unwrap();
+        let Ok(mut transport) = SmtpTransport::new(client, stream).await else {
+            return false;
+        };
 
-        transport
+        if let Err(_) = transport
             .get_mut()
             .command(MailCommand::new(
                 Some("random.guy@fit.com".parse().unwrap()),
                 vec![],
             ))
             .await
-            .unwrap();
+        {
+            return false;
+        }
 
-        let response = transport
+        let Ok(response) = transport
             .get_mut()
             .command(RcptCommand::new(email.parse().unwrap(), vec![]))
             .await
-            .unwrap();
+        else {
+            return false;
+        };
 
         response.is_positive()
     }

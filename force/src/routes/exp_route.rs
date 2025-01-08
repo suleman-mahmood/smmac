@@ -1,22 +1,15 @@
 use actix_web::{get, web, HttpResponse};
-use async_smtp::{
-    commands::{MailCommand, RcptCommand},
-    Envelope, SendableEmail, SmtpClient, SmtpTransport,
-};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
-use tokio::{
-    io::{AsyncRead, AsyncWrite, BufStream},
-    net::TcpStream,
-};
+use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
 use crate::{
     dal::lead_db::{EmailReachability, EmailVerifiedStatus},
-    domain::email::{Reachability, VerificationStatus},
-    services::{ProductQuerySender, Sentinel},
+    domain::email::{FounderDomainEmail, Reachability, VerificationStatus},
+    services::{PersistantData, PersistantDataSender, ProductQuerySender, Sentinel},
 };
 
 #[get("/check-channel-works")]
@@ -429,27 +422,37 @@ async fn scrape_smart_scout(pool: web::Data<PgPool>) -> HttpResponse {
 }
 
 #[get("/verify-emails")]
-async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
-    let emails: Vec<String> = vec![
-        "wbush@nimble.com".to_string(),
-        "wesb@nimble.com".to_string(),
-        "bush@nimble.com".to_string(),
-        "wes@nimble.com".to_string(),
-        "andresp@nimble.com".to_string(),
-        "johnk@nimble.com".to_string(),
-        "johnkostoulas@nimble.com".to_string(),
-        "john@nimble.com".to_string(),
-        "awallace@nimble.com".to_string(),
-        "alanw@nimble.com".to_string(),
-        "sulemanmahmood9988347@gmail.com".to_string(),
-        "suleman@mazlo.com".to_string(),
-        "sulemanmahmood99@gmail.com".to_string(),
-    ];
+async fn verify_emails(
+    pool: web::Data<PgPool>,
+    persistant_data_sender: web::Data<PersistantDataSender>,
+) -> HttpResponse {
+    let emails = sqlx::query!(
+        r"
+        select
+            email_address,
+            founder_name,
+            domain
+        from
+            email
+        where
+            verification_status = 'PENDING'
+        order by created_at desc
+        limit 1000
+        "
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .unwrap();
 
     for em in emails {
-        let status = sentinel.verify_email_manual(&em).await;
-        log::info!("{} is valid? {}", em, status);
+        persistant_data_sender
+            .sender
+            .send(PersistantData::Email(FounderDomainEmail {
+                founder_name: em.founder_name,
+                domain: em.domain,
+                email: em.email_address,
+            }))
+            .unwrap();
     }
-
     HttpResponse::Ok().body("Done!")
 }
