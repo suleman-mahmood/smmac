@@ -1,5 +1,8 @@
 use actix_web::{get, web, HttpResponse};
-use async_smtp::{Envelope, SendableEmail, SmtpClient, SmtpTransport};
+use async_smtp::{
+    commands::{MailCommand, RcptCommand},
+    Envelope, SendableEmail, SmtpClient, SmtpTransport,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -482,15 +485,24 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
         let client = SmtpClient::new();
         let mut transport = SmtpTransport::new(client, stream).await.unwrap();
 
-        let email = SendableEmail::new(
-            Envelope::new(
+        let response = transport
+            .get_mut()
+            .command(MailCommand::new(
                 Some("random.guy@fit.com".parse().unwrap()),
-                vec![em.parse().unwrap()],
-            )
-            .unwrap(),
-            "verywellfit.com",
-        );
-        let response = transport.send(email).await.unwrap();
+                vec![],
+            ))
+            .await
+            .unwrap();
+
+        log::info!("How is the response? {:?}", response.is_positive());
+        log::info!("Code: {:?}", response.code);
+        log::info!("Response: {:?}", response);
+
+        let response = transport
+            .get_mut()
+            .command(RcptCommand::new(em.parse().unwrap(), vec![]))
+            .await
+            .unwrap();
 
         log::info!("How is the response? {:?}", response.is_positive());
         log::info!("Code: {:?}", response.code);
