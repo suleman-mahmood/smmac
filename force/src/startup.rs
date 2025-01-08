@@ -15,7 +15,7 @@ use crate::{
         lead_route, lightning_route, login_route, product_route, verified_email_route,
     },
     services::{
-        OpenaiClient, PersistantDataSender, ProductQuerySender, Sentinel, VerifiedEmailReceiver,
+        EmailVerifierSender, OpenaiClient, ProductQuerySender, Sentinel, VerifiedEmailReceiver,
     },
 };
 
@@ -26,13 +26,13 @@ pub fn run(
     sentinel: Data<Sentinel>,
     product_query_sender: ProductQuerySender,
     verified_email_receiver: VerifiedEmailReceiver,
-    persistant_data_sender: PersistantDataSender,
+    email_verifier_sender: EmailVerifierSender,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let openai_client = web::Data::new(openai_client);
     let product_query_sender = web::Data::new(product_query_sender);
     let verified_email_receiver = web::Data::new(verified_email_receiver);
-    let persistant_data_sender = web::Data::new(persistant_data_sender);
+    let email_verifier_sender = web::Data::new(email_verifier_sender);
 
     let server = HttpServer::new(move || {
         App::new()
@@ -81,7 +81,7 @@ pub fn run(
             .app_data(sentinel.clone())
             .app_data(product_query_sender.clone())
             .app_data(verified_email_receiver.clone())
-            .app_data(persistant_data_sender.clone())
+            .app_data(email_verifier_sender.clone())
     })
     .listen(listener)?
     .run();

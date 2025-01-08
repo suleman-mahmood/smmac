@@ -7,9 +7,9 @@ use force::{
     domain::email::FounderDomainEmail,
     services::{
         data_persistance_handler, domain_scraper_handler, email_verified_handler,
-        founder_scraper_handler, smart_scout_scraper_handler, FounderQueryChannelData,
-        OpenaiClient, PersistantData, PersistantDataSender, ProductQuerySender, Sentinel,
-        VerifiedEmailReceiver,
+        founder_scraper_handler, smart_scout_scraper_handler, EmailVerifierSender,
+        FounderQueryChannelData, OpenaiClient, PersistantData, PersistantDataSender,
+        ProductQuerySender, Sentinel, VerifiedEmailReceiver,
     },
     startup::run,
 };
@@ -55,8 +55,8 @@ async fn main() -> std::io::Result<()> {
     let verified_email_receiver = VerifiedEmailReceiver {
         sender: verified_email_sender.clone(),
     };
-    let persistant_data_sender_api = PersistantDataSender {
-        sender: persistant_data_sender.clone(),
+    let email_verifier_sender = EmailVerifierSender {
+        sender: email_sender.clone(),
     };
 
     // Spawn backgound tasks
@@ -101,7 +101,7 @@ async fn main() -> std::io::Result<()> {
         sentinel,
         product_query_sender,
         verified_email_receiver,
-        persistant_data_sender_api,
+        email_verifier_sender,
     )?
     .await
 }

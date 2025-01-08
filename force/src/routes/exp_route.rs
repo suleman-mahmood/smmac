@@ -9,7 +9,9 @@ use uuid::Uuid;
 use crate::{
     dal::lead_db::{EmailReachability, EmailVerifiedStatus},
     domain::email::{FounderDomainEmail, Reachability, VerificationStatus},
-    services::{PersistantData, PersistantDataSender, ProductQuerySender, Sentinel},
+    services::{
+        EmailVerifierSender, PersistantData, PersistantDataSender, ProductQuerySender, Sentinel,
+    },
 };
 
 #[get("/check-channel-works")]
@@ -424,7 +426,7 @@ async fn scrape_smart_scout(pool: web::Data<PgPool>) -> HttpResponse {
 #[get("/verify-emails")]
 async fn verify_emails(
     pool: web::Data<PgPool>,
-    persistant_data_sender: web::Data<PersistantDataSender>,
+    email_verifier_sender: web::Data<EmailVerifierSender>,
 ) -> HttpResponse {
     let emails = sqlx::query!(
         r"
@@ -445,13 +447,13 @@ async fn verify_emails(
     .unwrap();
 
     for em in emails {
-        persistant_data_sender
+        email_verifier_sender
             .sender
-            .send(PersistantData::Email(FounderDomainEmail {
+            .send(FounderDomainEmail {
                 founder_name: em.founder_name,
                 domain: em.domain,
                 email: em.email_address,
-            }))
+            })
             .unwrap();
     }
     HttpResponse::Ok().body("Done!")

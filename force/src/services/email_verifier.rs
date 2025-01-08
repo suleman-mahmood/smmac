@@ -1,7 +1,6 @@
 use std::{collections::HashSet, error::Error};
 
 use actix_web::web::Data;
-use check_if_email_exists::Reachable;
 use tokio::sync::{
     broadcast,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -15,6 +14,10 @@ const SET_RESET_LEN: usize = 10_000;
 
 pub struct VerifiedEmailReceiver {
     pub sender: broadcast::Sender<String>,
+}
+
+pub struct EmailVerifierSender {
+    pub sender: UnboundedSender<FounderDomainEmail>,
 }
 
 pub async fn email_verified_handler(
