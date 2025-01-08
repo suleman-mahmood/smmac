@@ -1,9 +1,13 @@
 use actix_web::{get, web, HttpResponse};
-use lettre::transport::smtp::{client::SmtpConnection, extension::ClientId};
+use async_smtp::{Envelope, SendableEmail, SmtpClient, SmtpTransport};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
+use tokio::{
+    io::{AsyncRead, AsyncWrite, BufStream},
+    net::TcpStream,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -465,34 +469,60 @@ async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
 
         let smtp_server = exchanges.first().unwrap();
         let smtp_server = smtp_server.trim_end_matches(".");
+        let smtp_server_port = format!("{}:25", smtp_server);
+
+        log::info!("Connecting to smtp server: {:?}", smtp_server_port);
+
+        // Define a new trait that combines AsyncRead, AsyncWrite, and Unpin
+        trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
+        impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
+
+        let stream = TcpStream::connect(smtp_server_port).await.unwrap();
+        let stream = BufStream::new(Box::new(stream) as Box<dyn AsyncReadWrite>);
+        let client = SmtpClient::new();
+        let mut transport = SmtpTransport::new(client, stream).await.unwrap();
+
+        let email = SendableEmail::new(
+            Envelope::new(
+                Some("random.guy@fit.com".parse().unwrap()),
+                vec![em.parse().unwrap()],
+            )
+            .unwrap(),
+            "verywellfit.com",
+        );
+        let response = transport.send(email).await.unwrap();
+
+        log::info!("How is the response? {:?}", response.is_positive());
+        log::info!("Code: {:?}", response.code);
+        log::info!("Response: {:?}", response);
 
         // Perform an SMTP handshake
-        let mut smtp_connection = SmtpConnection::connect(
-            format!("{}:25", smtp_server),
-            None,
-            &ClientId::Domain("verwellfit.com".to_string()),
-            None,
-            None,
-        )
-        .unwrap();
-
-        log::info!("Got ehlo response: {:?}", smtp_connection.read_response());
-
-        let response = smtp_connection
-            .command(format!("MAIL FROM:<noreply@yourdomain.com>"))
-            .unwrap();
-        log::info!("How is the response? {:?}", response.code().is_positive());
-        log::info!("Code: {:?}", response.code());
-        log::info!("Response: {:?}", response);
-
-        let response = smtp_connection
-            .command(format!("RCPT TO:<{}>", em))
-            .unwrap();
-        smtp_connection.quit().unwrap();
-
-        log::info!("How is the response? {:?}", response.code().is_positive());
-        log::info!("Code: {:?}", response.code());
-        log::info!("Response: {:?}", response);
+        // let mut smtp_connection = SmtpConnection::connect(
+        //     format!("{}:25", smtp_server),
+        //     None,
+        //     &ClientId::Domain("verwellfit.com".to_string()),
+        //     None,
+        //     None,
+        // )
+        // .unwrap();
+        //
+        // log::info!("Got ehlo response: {:?}", smtp_connection.read_response());
+        //
+        // let response = smtp_connection
+        //     .command(format!("MAIL FROM:<noreply@yourdomain.com>"))
+        //     .unwrap();
+        // log::info!("How is the response? {:?}", response.code().is_positive());
+        // log::info!("Code: {:?}", response.code());
+        // log::info!("Response: {:?}", response);
+        //
+        // let response = smtp_connection
+        //     .command(format!("RCPT TO:<{}>", em))
+        //     .unwrap();
+        // smtp_connection.quit().unwrap();
+        //
+        // log::info!("How is the response? {:?}", response.code().is_positive());
+        // log::info!("Code: {:?}", response.code());
+        // log::info!("Response: {:?}", response);
     }
 
     HttpResponse::Ok().body("Done!")
