@@ -432,109 +432,23 @@ async fn scrape_smart_scout(pool: web::Data<PgPool>) -> HttpResponse {
 async fn verify_emails(sentinel: web::Data<Sentinel>) -> HttpResponse {
     let emails: Vec<String> = vec![
         "wbush@nimble.com".to_string(),
-        // "wesb@nimble.com".to_string(),
-        // "bush@nimble.com".to_string(),
-        // "wes@nimble.com".to_string(),
-        // "andresp@nimble.com".to_string(),
-        // "johnk@nimble.com".to_string(),
-        // "johnkostoulas@nimble.com".to_string(),
-        // "john@nimble.com".to_string(),
-        // "awallace@nimble.com".to_string(),
-        // "alanw@nimble.com".to_string(),
-        // "sulemanmahmood9988347@gmail.com".to_string(),
-        // "suleman@mazlo.com".to_string(),
+        "wesb@nimble.com".to_string(),
+        "bush@nimble.com".to_string(),
+        "wes@nimble.com".to_string(),
+        "andresp@nimble.com".to_string(),
+        "johnk@nimble.com".to_string(),
+        "johnkostoulas@nimble.com".to_string(),
+        "john@nimble.com".to_string(),
+        "awallace@nimble.com".to_string(),
+        "alanw@nimble.com".to_string(),
+        "sulemanmahmood9988347@gmail.com".to_string(),
+        "suleman@mazlo.com".to_string(),
         "sulemanmahmood99@gmail.com".to_string(),
     ];
 
     for em in emails {
-        // CheckEmailOutput input: "sulemanmahmood99@gmail.com", is_reachable: Safe, misc: Ok(MiscDetails { is_disposable: false, is_role_account: false, gravatar_url: None, haveibeenpwned: None }),
-        //   mx: Ok(MxDetails { lookup: Ok(MxLookup(Lookup { query: Query { name: Name("gmail.com"), query_type: MX, query_class: IN },
-        //     records: [
-        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 30, exchange: Name("alt3.gmail-smtp-in.l.google.com.") })) },
-        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 10, exchange: Name("alt1.gmail-smtp-in.l.google.com.") })) },
-        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 20, exchange: Name("alt2.gmail-smtp-in.l.google.com.") })) },
-        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 40, exchange: Name("alt4.gmail-smtp-in.l.google.com.") })) },
-        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 5, exchange: Name("gmail-smtp-in.l.google.com.") })) }
-        //     ],
-        //     valid_until: Instant { tv_sec: 6077130, tv_nsec: 595604176 } })) })
-
-        let email_output = sentinel.get_email_info(&em).await;
-        let exchanges: Vec<String> = email_output
-            .mx
-            .unwrap()
-            .lookup
-            .unwrap()
-            .iter()
-            .map(|rdata| rdata.exchange().to_string())
-            .collect();
-
-        log::info!("Got exchangese: {:?}", exchanges);
-
-        let smtp_server = exchanges.first().unwrap();
-        let smtp_server = smtp_server.trim_end_matches(".");
-        let smtp_server_port = format!("{}:25", smtp_server);
-
-        log::info!("Connecting to smtp server: {:?}", smtp_server_port);
-
-        // Define a new trait that combines AsyncRead, AsyncWrite, and Unpin
-        trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-        impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
-
-        let stream = TcpStream::connect(smtp_server_port).await.unwrap();
-        let stream = BufStream::new(Box::new(stream) as Box<dyn AsyncReadWrite>);
-        let client = SmtpClient::new();
-        let mut transport = SmtpTransport::new(client, stream).await.unwrap();
-
-        let response = transport
-            .get_mut()
-            .command(MailCommand::new(
-                Some("random.guy@fit.com".parse().unwrap()),
-                vec![],
-            ))
-            .await
-            .unwrap();
-
-        log::info!("How is the response? {:?}", response.is_positive());
-        log::info!("Code: {:?}", response.code);
-        log::info!("Response: {:?}", response);
-
-        let response = transport
-            .get_mut()
-            .command(RcptCommand::new(em.parse().unwrap(), vec![]))
-            .await
-            .unwrap();
-
-        log::info!("How is the response? {:?}", response.is_positive());
-        log::info!("Code: {:?}", response.code);
-        log::info!("Response: {:?}", response);
-
-        // Perform an SMTP handshake
-        // let mut smtp_connection = SmtpConnection::connect(
-        //     format!("{}:25", smtp_server),
-        //     None,
-        //     &ClientId::Domain("verwellfit.com".to_string()),
-        //     None,
-        //     None,
-        // )
-        // .unwrap();
-        //
-        // log::info!("Got ehlo response: {:?}", smtp_connection.read_response());
-        //
-        // let response = smtp_connection
-        //     .command(format!("MAIL FROM:<noreply@yourdomain.com>"))
-        //     .unwrap();
-        // log::info!("How is the response? {:?}", response.code().is_positive());
-        // log::info!("Code: {:?}", response.code());
-        // log::info!("Response: {:?}", response);
-        //
-        // let response = smtp_connection
-        //     .command(format!("RCPT TO:<{}>", em))
-        //     .unwrap();
-        // smtp_connection.quit().unwrap();
-        //
-        // log::info!("How is the response? {:?}", response.code().is_positive());
-        // log::info!("Code: {:?}", response.code());
-        // log::info!("Response: {:?}", response);
+        let status = sentinel.verify_email_manual(&em).await;
+        log::info!("{} is valid? {}", em, status);
     }
 
     HttpResponse::Ok().body("Done!")
