@@ -439,7 +439,7 @@ async fn verify_emails(
         where
             verification_status = 'PENDING'
         order by created_at desc
-        limit 1000
+        limit 14000
         "
     )
     .fetch_all(pool.as_ref())
