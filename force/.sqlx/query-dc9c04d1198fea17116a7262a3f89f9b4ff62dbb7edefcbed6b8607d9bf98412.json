@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            email_address,\n            founder_name,\n            domain\n        from\n            email\n        where\n            verification_status = 'PENDING' and\n            created_at BETWEEN '2025-01-11 12:08:00' AND '2025-01-11 12:38:00'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "founder_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "dc9c04d1198fea17116a7262a3f89f9b4ff62dbb7edefcbed6b8607d9bf98412"
+}
