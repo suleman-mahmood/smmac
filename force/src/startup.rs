@@ -44,8 +44,7 @@ pub fn run(
             .service(
                 web::scope("/exp")
                     .service(exp_route::check_channel_works)
-                    .service(exp_route::verify_emails)
-                    .service(exp_route::migrate),
+                    .service(exp_route::verify_emails),
             )
             // .service(
             //     web::scope("/exp")

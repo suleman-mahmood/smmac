@@ -1,6 +1,3 @@
-use core::f64;
-use std::u16;
-
 use actix_web::{get, web, HttpResponse};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -11,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     dal::lead_db::{EmailReachability, EmailVerifiedStatus},
     domain::email::{FounderDomainEmail, Reachability, VerificationStatus},
-    services::{EmailVerifierSender, ProductQuerySender, Sentinel},
+    services::{EmailVerifierSender, ProductQuerySender},
 };
 
 #[get("/check-channel-works")]
