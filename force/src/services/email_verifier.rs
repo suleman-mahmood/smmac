@@ -1,7 +1,6 @@
 use std::{collections::HashSet, error::Error};
 
 use actix_web::web::Data;
-use check_if_email_exists::Reachable;
 use tokio::sync::{
     broadcast,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -15,6 +14,10 @@ const SET_RESET_LEN: usize = 10_000;
 
 pub struct VerifiedEmailReceiver {
     pub sender: broadcast::Sender<String>,
+}
+
+pub struct EmailVerifierSender {
+    pub sender: UnboundedSender<FounderDomainEmail>,
 }
 
 pub async fn email_verified_handler(
@@ -59,20 +62,40 @@ async fn verify_email(
 ) {
     log::info!("Verifying email: {}", email.email);
 
-    let reachable = sentinel.get_email_verification_status(&email.email).await;
-    match reachable {
-        Reachable::Safe => {
-            verified_email_sender.send(email.email.clone()).unwrap();
-            if let Err(e) =
-                persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
-            {
-                log::error!(
-                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
-                    e,
-                    e.source(),
-                );
-            }
+    let valid = sentinel.verify_email_manual(&email.email).await;
+    if valid {
+        if let Err(e) = verified_email_sender.send(email.email.clone()) {
+            log::error!(
+                "Verified email sender broadcast channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
         }
-        _ => {}
-    };
+        if let Err(e) =
+            persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
+        {
+            log::error!(
+                "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
+        }
+    }
+
+    // let reachable = sentinel.get_email_verification_status(&email.email).await;
+    // match reachable {
+    //     Reachable::Safe => {
+    //         verified_email_sender.send(email.email.clone()).unwrap();
+    //         if let Err(e) =
+    //             persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
+    //         {
+    //             log::error!(
+    //                 "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+    //                 e,
+    //                 e.source(),
+    //             );
+    //         }
+    //     }
+    //     _ => {}
+    // };
 }

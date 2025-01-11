@@ -637,6 +637,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-smtp"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ee04bcf0a7ebf5594f9aff84935dc8cb0490b65055913a7a4c4d08f81e181d6"
+dependencies = [
+ "anyhow",
+ "base64 0.13.1",
+ "futures",
+ "log",
+ "nom",
+ "pin-project",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "async-std"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -900,7 +916,7 @@ checksum = "49f11d61ef99e1fecec73a0b9a8bf45ed7e66923e71dadcadcf650b383901eb2"
 dependencies = [
  "async-native-tls",
  "async-recursion",
- "async-smtp",
+ "async-smtp 0.6.0",
  "async-std",
  "async-std-resolver",
  "fast-socks5 0.9.6",
@@ -1596,6 +1612,7 @@ dependencies = [
  "anyhow",
  "askama",
  "async-openai",
+ "async-smtp 0.10.0",
  "check-if-email-exists",
  "config",
  "env_logger",

@@ -1,6 +1,16 @@
-use check_if_email_exists::{check_email, CheckEmailInput, Reachable};
+use std::time::Duration;
+
+use async_smtp::{
+    commands::{MailCommand, RcptCommand},
+    SmtpClient, SmtpTransport,
+};
+use check_if_email_exists::{check_email, CheckEmailInput, CheckEmailOutput, Reachable};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, BufStream},
+    net::TcpStream,
+};
 
 pub struct Sentinel {
     client: Client,
@@ -101,5 +111,78 @@ impl Sentinel {
         log::info!("{} verification result {:?}", email, result);
 
         result.is_reachable
+    }
+
+    async fn get_email_info(&self, email: &str) -> CheckEmailOutput {
+        let mut input = CheckEmailInput::new(email.to_string());
+        input.set_smtp_timeout(Some(Duration::from_millis(100)));
+
+        check_email(&input).await
+    }
+
+    pub async fn verify_email_manual(&self, email: &str) -> bool {
+        let dns_info = self.get_email_info(email).await;
+
+        // CheckEmailOutput input: "sulemanmahmood99@gmail.com", is_reachable: Safe, misc: Ok(MiscDetails { is_disposable: false, is_role_account: false, gravatar_url: None, haveibeenpwned: None }),
+        //   mx: Ok(MxDetails { lookup: Ok(MxLookup(Lookup { query: Query { name: Name("gmail.com"), query_type: MX, query_class: IN },
+        //     records: [
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 30, exchange: Name("alt3.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 10, exchange: Name("alt1.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 20, exchange: Name("alt2.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 40, exchange: Name("alt4.gmail-smtp-in.l.google.com.") })) },
+        //       Record { name_labels: Name("gmail.com."), rr_type: MX, dns_class: IN, ttl: 1411, rdata: Some(MX(MX { preference: 5, exchange: Name("gmail-smtp-in.l.google.com.") })) }
+        //     ],
+        //     valid_until: Instant { tv_sec: 6077130, tv_nsec: 595604176 } })) })
+        let Ok(mx) = dns_info.mx else {
+            return false;
+        };
+        let Ok(lookup) = mx.lookup else {
+            return false;
+        };
+        let exchanges: Vec<String> = lookup
+            .iter()
+            .map(|rdata| rdata.exchange().to_string())
+            .collect();
+
+        let Some(first_exchange) = exchanges.first() else {
+            return false;
+        };
+        let smtp_server = first_exchange;
+        let smtp_server = smtp_server.trim_end_matches(".");
+        let smtp_server_port = format!("{}:25", smtp_server);
+
+        // Define a new trait that combines AsyncRead, AsyncWrite, and Unpin
+        trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
+        impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
+
+        let Ok(stream) = TcpStream::connect(smtp_server_port).await else {
+            return false;
+        };
+        let stream = BufStream::new(Box::new(stream) as Box<dyn AsyncReadWrite>);
+        let client = SmtpClient::new();
+        let Ok(mut transport) = SmtpTransport::new(client, stream).await else {
+            return false;
+        };
+
+        if let Err(_) = transport
+            .get_mut()
+            .command(MailCommand::new(
+                Some("random.guy@fit.com".parse().unwrap()),
+                vec![],
+            ))
+            .await
+        {
+            return false;
+        }
+
+        let Ok(response) = transport
+            .get_mut()
+            .command(RcptCommand::new(email.parse().unwrap(), vec![]))
+            .await
+        else {
+            return false;
+        };
+
+        response.is_positive()
     }
 }

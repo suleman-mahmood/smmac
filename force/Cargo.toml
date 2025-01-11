@@ -34,6 +34,7 @@ check-if-email-exists = "0.9"
 scraper = "0.22"
 anyhow = "1.0"
 strsim = "0.11"
+async-smtp = "0.10"
 
 [dependencies.sqlx]
 version = "0.8"

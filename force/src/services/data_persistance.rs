@@ -16,6 +16,10 @@ use crate::{
     },
 };
 
+pub struct PersistantDataSender {
+    pub sender: UnboundedSender<PersistantData>,
+}
+
 pub enum PersistantData {
     Domain(DomainData),
     Founder(FounderData),
