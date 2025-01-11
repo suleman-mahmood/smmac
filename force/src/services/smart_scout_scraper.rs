@@ -25,8 +25,6 @@ pub async fn smart_scout_scraper_handler(
     founder_query_sender: UnboundedSender<FounderQueryChannelData>,
     persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
-    return;
-
     log::info!("Started smart scout scraper");
 
     // Create a 30 min interval
