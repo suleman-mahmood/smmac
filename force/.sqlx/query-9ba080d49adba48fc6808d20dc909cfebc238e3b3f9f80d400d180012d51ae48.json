@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            email_address,\n            founder_name,\n            domain\n        from\n            email\n        where\n            verification_status = 'PENDING'\n        order by created_at desc\n        limit 14000\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "founder_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9ba080d49adba48fc6808d20dc909cfebc238e3b3f9f80d400d180012d51ae48"
+}
