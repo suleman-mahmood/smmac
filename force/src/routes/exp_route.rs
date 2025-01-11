@@ -456,3 +456,39 @@ async fn verify_emails(
 
     HttpResponse::Ok().body("Done!")
 }
+
+#[get("/verify-emails-custom")]
+async fn verify_emails_custom(
+    pool: web::Data<PgPool>,
+    email_verifier_sender: web::Data<EmailVerifierSender>,
+) -> HttpResponse {
+    let emails = sqlx::query!(
+        r"
+        select
+            email_address,
+            founder_name,
+            domain
+        from
+            email
+        where
+            verification_status = 'PENDING' and
+            created_at BETWEEN '2025-01-11 12:08:00' AND '2025-01-11 12:38:00'
+        "
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .unwrap();
+
+    for em in emails {
+        email_verifier_sender
+            .sender
+            .send(FounderDomainEmail {
+                founder_name: em.founder_name,
+                domain: em.domain,
+                email: em.email_address,
+            })
+            .unwrap();
+    }
+
+    HttpResponse::Ok().body("Done!")
+}

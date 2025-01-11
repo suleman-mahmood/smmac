@@ -62,22 +62,42 @@ async fn verify_email(
 ) {
     log::info!("Verifying email: {}", email.email);
 
-    let reachable = sentinel.get_email_verification_status(&email.email).await;
-    match reachable {
-        Reachable::Safe => {
-            // Errors if there is no route thread listening for verified emails
-            _ = verified_email_sender.send(email.email.clone());
-
-            if let Err(e) =
-                persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
-            {
-                log::error!(
-                    "Persistant data sender channel got an Error: {:?} | Source: {:?}",
-                    e,
-                    e.source(),
-                );
-            }
+    let valid = sentinel.verify_email_manual(&email.email).await;
+    if valid {
+        if let Err(e) = verified_email_sender.send(email.email.clone()) {
+            log::error!(
+                "Verified email sender broadcast channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
         }
-        _ => {}
-    };
+        if let Err(e) =
+            persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
+        {
+            log::error!(
+                "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
+        }
+    }
+
+    // let reachable = sentinel.get_email_verification_status(&email.email).await;
+    // match reachable {
+    //     Reachable::Safe => {
+    //         // Errors if there is no route thread listening for verified emails
+    //         _ = verified_email_sender.send(email.email.clone());
+    //
+    //         if let Err(e) =
+    //             persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
+    //         {
+    //             log::error!(
+    //                 "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+    //                 e,
+    //                 e.source(),
+    //             );
+    //         }
+    //     }
+    //     _ => {}
+    // };
 }
