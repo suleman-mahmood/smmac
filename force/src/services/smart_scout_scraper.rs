@@ -37,6 +37,7 @@ pub async fn smart_scout_scraper_handler(
         3. Get 'n' (random) unscraped jobs from the smart scout table
         4. Start scraping them
         */
+        return;
         interval.tick().await;
 
         // TODO: Stop condition
