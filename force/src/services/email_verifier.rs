@@ -64,13 +64,9 @@ async fn verify_email(
 
     let valid = sentinel.verify_email_manual(&email.email).await;
     if valid {
-        if let Err(e) = verified_email_sender.send(email.email.clone()) {
-            log::error!(
-                "Verified email sender broadcast channel got an Error: {:?} | Source: {:?}",
-                e,
-                e.source(),
-            );
-        }
+        // Errors if there is no route thread listening for verified emails
+        _ = verified_email_sender.send(email.email.clone());
+
         if let Err(e) =
             persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
         {
