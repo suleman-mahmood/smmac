@@ -16,6 +16,9 @@ const SET_RESET_LEN: usize = 10_000;
 pub struct VerifiedEmailReceiver {
     pub sender: broadcast::Sender<String>,
 }
+pub struct EmailVerifierSender {
+    pub sender: UnboundedSender<FounderDomainEmail>,
+}
 
 pub async fn email_verified_handler(
     sentinel: Data<Sentinel>,
@@ -55,14 +58,16 @@ async fn verify_email(
     sentinel: Data<Sentinel>,
     persistant_data_sender: UnboundedSender<PersistantData>,
     verified_email_sender: broadcast::Sender<String>,
-    email: FounderDomainEmail,
+    email: FounderDomainEmail, // TODO: Use only email
 ) {
     log::info!("Verifying email: {}", email.email);
 
     let reachable = sentinel.get_email_verification_status(&email.email).await;
     match reachable {
         Reachable::Safe => {
-            verified_email_sender.send(email.email.clone()).unwrap();
+            // Errors if there is no route thread listening for verified emails
+            _ = verified_email_sender.send(email.email.clone());
+
             if let Err(e) =
                 persistant_data_sender.send(PersistantData::UpdateEmailVerified(email.email))
             {
