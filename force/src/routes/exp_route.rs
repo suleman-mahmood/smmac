@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     dal::lead_db::{EmailReachability, EmailVerifiedStatus},
     domain::email::{FounderDomainEmail, Reachability, VerificationStatus},
-    services::{EmailVerifierSender, ProductQuerySender},
+    services::{EmailVerifierSender, ProductQuerySender, Sentinel},
 };
 
 #[get("/check-channel-works")]
@@ -488,6 +488,38 @@ async fn verify_emails_custom(
                 email: em.email_address,
             })
             .unwrap();
+    }
+
+    HttpResponse::Ok().body("Done!")
+}
+
+#[get("/verify-emails-hardcoded")]
+async fn verify_emails_hardcoded(sentinel: web::Data<Sentinel>) -> HttpResponse {
+    let emails = [
+        "bmurphy@summitparkllc.com".to_string(),
+        "rhannon@summitparkllc.com".to_string(),
+        "jjohnson@summitparkllc.com".to_string(),
+        "summitpark@summitparkllc.com".to_string(),
+        "ruth.barclay@macmillan.com".to_string(),
+        "brian.mcsharry@macmillan.com".to_string(),
+        "liamc@zentrallc.com".to_string(),
+        "staceyk@zentrallc.com".to_string(),
+        "ailun.fu@ailun.com".to_string(),
+        "about@pinterest.com".to_string(),
+        "brad.gordon@charmast.com".to_string(),
+        "john@charmast.com".to_string(),
+        "michelangelo@amazon.es".to_string(),
+        "xiny@amazon.es".to_string(),
+        "kevin.audibert@amazon.fr".to_string(),
+        "adrien@amazon.fr".to_string(),
+        "xavier@amazon.fr".to_string(),
+        "sportsman's.guide@sportsmansguide.com".to_string(),
+        "ron@twowaydirect.com".to_string(),
+        "christina@twowaydirect.com".to_string(),
+    ];
+
+    for em in emails {
+        sentinel.verify_email_manual(&em).await;
     }
 
     HttpResponse::Ok().body("Done!")

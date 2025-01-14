@@ -181,6 +181,12 @@ impl Sentinel {
             return false;
         };
 
+        log::info!("First word: {:?}", response.first_word());
+        log::info!("First line: {:?}", response.first_line());
+        log::info!("Response message: {:?}", response.clone().message);
+        log::info!("Response code: {:?}", response.code);
+        log::info!("Entire response: {:?}", response);
+
         response.is_positive()
     }
 }
