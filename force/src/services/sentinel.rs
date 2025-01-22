@@ -181,12 +181,26 @@ impl Sentinel {
             return false;
         };
 
-        log::info!("First word: {:?}", response.first_word());
-        log::info!("First line: {:?}", response.first_line());
-        log::info!("Response message: {:?}", response.clone().message);
-        log::info!("Response code: {:?}", response.code);
-        log::info!("Entire response: {:?}", response);
+        // log::info!("First word: {:?}", response.first_word());
+        // log::info!("First line: {:?}", response.first_line());
+        // log::info!("Response message: {:?}", response.clone().message);
+        // log::info!("Response code: {:?}", response.code);
+        // log::info!("Entire response: {:?}", response);
 
-        response.is_positive()
+        if !response.is_positive() {
+            return false;
+        }
+
+        match response.first_word() {
+            Some(first_word) => {
+                let first_word = first_word.to_lowercase();
+                match first_word.as_str() {
+                    "recipient" => false,
+                    "ok" => false,
+                    _ => true,
+                }
+            }
+            None => false,
+        }
     }
 }
