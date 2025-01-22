@@ -22,6 +22,7 @@ pub enum PersistantData {
     CompanyName(CompanyNameData),
     Email(FounderDomainEmail),
     UpdateEmailVerified(String),
+    UpdateEmailUnverified(String),
     CompleteSmartScoutJob(i64),
 }
 
@@ -217,6 +218,11 @@ pub async fn data_persistance_handler(
             PersistantData::UpdateEmailVerified(email) => {
                 if let Err(e) = email_db::update_email_verified(con, email).await {
                     log::error!("Error while persisting email verified status: {:?}", e);
+                }
+            }
+            PersistantData::UpdateEmailUnverified(email) => {
+                if let Err(e) = email_db::update_email_unverified(con, email).await {
+                    log::error!("Error while persisting email unverified status: {:?}", e);
                 }
             }
             PersistantData::CompleteSmartScoutJob(smart_scout_id) => {

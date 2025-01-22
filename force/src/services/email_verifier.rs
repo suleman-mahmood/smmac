@@ -76,6 +76,16 @@ async fn verify_email(
                 e.source(),
             );
         }
+    } else {
+        if let Err(e) =
+            persistant_data_sender.send(PersistantData::UpdateEmailUnverified(email.email))
+        {
+            log::error!(
+                "Persistant data sender channel got an Error: {:?} | Source: {:?}",
+                e,
+                e.source(),
+            );
+        }
     }
 
     // let reachable = sentinel.get_email_verification_status(&email.email).await;

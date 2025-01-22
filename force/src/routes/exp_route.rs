@@ -524,3 +524,36 @@ async fn verify_emails_hardcoded(sentinel: web::Data<Sentinel>) -> HttpResponse 
 
     HttpResponse::Ok().body("Done!")
 }
+
+#[get("/verify-emails-smart-scout")]
+async fn verify_emails_smart_scout(
+    pool: web::Data<PgPool>,
+    email_verifier_sender: web::Data<EmailVerifierSender>,
+) -> HttpResponse {
+    let emails = sqlx::query!(
+        r"
+        select
+            email_address,
+            founder_name,
+            domain
+        from
+            email
+        "
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .unwrap();
+
+    for em in emails {
+        email_verifier_sender
+            .sender
+            .send(FounderDomainEmail {
+                founder_name: em.founder_name,
+                domain: em.domain,
+                email: em.email_address,
+            })
+            .unwrap();
+    }
+
+    HttpResponse::Ok().body("Done!")
+}

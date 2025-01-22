@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        update email set\n            reachability = 'INVALID',\n            verification_status = 'INVALID'\n        where\n            email_address = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c8d426f7c8e158c1dd3e4278e08ae0c6a12aad39e0ec06f804f88f1eaf0b10b9"
+}

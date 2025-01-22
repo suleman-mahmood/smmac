@@ -153,7 +153,7 @@ impl Sentinel {
         trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
         impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 
-        let Ok(stream) = TcpStream::connect(smtp_server_port).await else {
+        let Ok(stream) = TcpStream::connect(smtp_server_port.clone()).await else {
             return false;
         };
         let stream = BufStream::new(Box::new(stream) as Box<dyn AsyncReadWrite>);
@@ -182,7 +182,12 @@ impl Sentinel {
         };
 
         // log::info!("First word: {:?}", response.first_word());
-        // log::info!("First line: {:?}", response.first_line());
+        log::info!(
+            "Email: {}; Exchange: {}; First line response: {:?}",
+            email,
+            smtp_server_port,
+            response.first_line(),
+        );
         // log::info!("Response message: {:?}", response.clone().message);
         // log::info!("Response code: {:?}", response.code);
         // log::info!("Entire response: {:?}", response);

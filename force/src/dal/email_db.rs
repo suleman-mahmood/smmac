@@ -37,6 +37,24 @@ pub async fn update_email_verified(
     .await
 }
 
+pub async fn update_email_unverified(
+    con: &mut PgConnection,
+    email: String,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        r"
+        update email set
+            reachability = 'INVALID',
+            verification_status = 'INVALID'
+        where
+            email_address = $1
+        ",
+        email,
+    )
+    .execute(con)
+    .await
+}
+
 pub async fn get_verified_emails_for_niche(
     pool: &PgPool,
     niche: &str,
