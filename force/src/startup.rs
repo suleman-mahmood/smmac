@@ -46,6 +46,7 @@ pub fn run(
                     .service(exp_route::check_channel_works)
                     .service(exp_route::verify_emails_custom)
                     .service(exp_route::verify_emails_hardcoded)
+                    .service(exp_route::verify_emails_smart_scout)
                     .service(exp_route::verify_emails),
             )
             // .service(
