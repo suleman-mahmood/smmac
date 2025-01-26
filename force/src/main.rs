@@ -6,10 +6,10 @@ use force::{
     configuration::get_configuration,
     domain::email::FounderDomainEmail,
     services::{
-        data_persistance_handler, domain_scraper_handler, email_verified_handler,
-        founder_scraper_handler, smart_scout_scraper_handler, EmailVerifierSender,
-        FounderQueryChannelData, OpenaiClient, PersistantData, ProductQuerySender, Sentinel,
-        VerifiedEmailReceiver,
+        data_persistance_handler, domain_qualifier_handler, domain_scraper_handler,
+        email_verified_handler, founder_scraper_handler, smart_scout_scraper_handler,
+        EmailVerifierSender, FounderQueryChannelData, OpenaiClient, PersistantData,
+        ProductQuerySender, Sentinel, VerifiedEmailReceiver,
     },
     startup::run,
 };
@@ -42,6 +42,7 @@ async fn main() -> std::io::Result<()> {
     let (product_query_sender, product_query_receiver) = mpsc::unbounded_channel::<String>();
     let (founder_query_sender, founder_query_receiver) =
         mpsc::unbounded_channel::<FounderQueryChannelData>();
+    let (domain_qualifier_sender, doomain_qualifier_receiver) = mpsc::unbounded_channel::<String>();
     let (email_sender, email_receiver) = mpsc::unbounded_channel::<FounderDomainEmail>();
     let (persistant_data_sender, persistant_data_receiver) =
         mpsc::unbounded_channel::<PersistantData>();
@@ -61,9 +62,26 @@ async fn main() -> std::io::Result<()> {
 
     // Spawn backgound tasks
     let pers_data_clone = persistant_data_sender.clone();
+    tokio::spawn(async move {
+        domain_scraper_handler(
+            product_query_receiver,
+            domain_qualifier_sender,
+            pers_data_clone,
+        )
+        .await
+    });
+
+    let sent_clone = sentinel.clone();
+    let pers_data_clone = persistant_data_sender.clone();
     let fou_q_clone = founder_query_sender.clone();
     tokio::spawn(async move {
-        domain_scraper_handler(product_query_receiver, fou_q_clone, pers_data_clone).await
+        domain_qualifier_handler(
+            sent_clone,
+            doomain_qualifier_receiver,
+            fou_q_clone,
+            pers_data_clone,
+        )
+        .await
     });
 
     let pers_data_clone = persistant_data_sender.clone();

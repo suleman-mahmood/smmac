@@ -1,19 +1,16 @@
 use std::{collections::HashSet, error::Error};
 
-const PAGE_DEPTH: u8 = 1;
-const SET_RESET_LEN: usize = 10_000;
-
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use crate::{
-    domain::html_tag::extract_domain,
-    routes::lead_route::{build_founder_seach_queries, BLACK_LIST_DOMAINS},
-};
+use crate::{domain::html_tag::extract_domain, routes::lead_route::BLACK_LIST_DOMAINS};
 
 use super::{
-    extract_data_from_google_search_with_reqwest, DomainData, DomainPageData,
-    FounderQueryChannelData, GoogleSearchResult, GoogleSearchType, PersistantData,
+    extract_data_from_google_search_with_reqwest, DomainData, DomainPageData, GoogleSearchResult,
+    GoogleSearchType, PersistantData,
 };
+
+const PAGE_DEPTH: u8 = 1;
+const SET_RESET_LEN: usize = 10_000;
 
 pub struct ProductQuerySender {
     pub sender: UnboundedSender<String>,
@@ -21,7 +18,7 @@ pub struct ProductQuerySender {
 
 pub async fn domain_scraper_handler(
     mut product_query_receiver: UnboundedReceiver<String>,
-    founder_query_sender: UnboundedSender<FounderQueryChannelData>,
+    domain_qualifier_sender: UnboundedSender<String>,
     persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Started domain scraper");
@@ -44,7 +41,7 @@ pub async fn domain_scraper_handler(
                 seen_queries.insert(query.clone());
                 tokio::spawn(scrape_domain_query(
                     query,
-                    founder_query_sender.clone(),
+                    domain_qualifier_sender.clone(),
                     persistant_data_sender.clone(),
                 ));
             }
@@ -54,7 +51,7 @@ pub async fn domain_scraper_handler(
 
 async fn scrape_domain_query(
     query: String,
-    founder_query_sender: UnboundedSender<FounderQueryChannelData>,
+    founder_qualifier_sender: UnboundedSender<String>,
     persistant_data_sender: UnboundedSender<PersistantData>,
 ) {
     log::info!("Scraping google for domain: {}", query);
@@ -92,14 +89,7 @@ async fn scrape_domain_query(
                             .iter()
                             .any(|&blacklist| domain.contains(blacklist))
                         {
-                            for query in build_founder_seach_queries(&domain) {
-                                founder_query_sender
-                                    .send(FounderQueryChannelData {
-                                        query,
-                                        domain: domain.clone(),
-                                    })
-                                    .unwrap();
-                            }
+                            founder_qualifier_sender.send(domain.clone()).unwrap();
                         }
                     }
                 }
