@@ -137,7 +137,11 @@ impl Sentinel {
         let Ok(lookup) = mx.lookup else {
             return false;
         };
-        let exchanges: Vec<String> = lookup
+
+        // Order exchanges by priority
+        let mut exchanges: Vec<_> = lookup.iter().collect();
+        exchanges.sort_by_key(|record| record.preference());
+        let exchanges: Vec<String> = exchanges
             .iter()
             .map(|rdata| rdata.exchange().to_string())
             .collect();
