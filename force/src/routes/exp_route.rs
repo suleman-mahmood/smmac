@@ -8,7 +8,11 @@ use uuid::Uuid;
 use crate::{
     dal::lead_db::{EmailReachability, EmailVerifiedStatus},
     domain::email::{FounderDomainEmail, Reachability, VerificationStatus},
-    services::{EmailVerifierSender, ProductQuerySender, Sentinel},
+    routes::lead_route::build_company_name_search_query,
+    services::{
+        extract_data_from_google_search_with_reqwest, EmailVerifierSender, GoogleSearchResult,
+        GoogleSearchType, ProductQuerySender, Sentinel,
+    },
 };
 
 #[get("/check-channel-works")]
@@ -556,4 +560,24 @@ async fn verify_emails_smart_scout(
     }
 
     HttpResponse::Ok().body("Done!")
+}
+
+#[get("/check-proxy-works")]
+async fn check_proxy_works() -> HttpResponse {
+    let query = build_company_name_search_query("AnkerDirect");
+
+    let google_search_result =
+        extract_data_from_google_search_with_reqwest(query.clone(), GoogleSearchType::CompanyName)
+            .await;
+
+    match google_search_result {
+        GoogleSearchResult::CompanyNames {
+            name_candidates,
+            page_source,
+        } => {
+            log::info!("Company name candidates: {:?}", name_candidates);
+            HttpResponse::Ok().body(page_source)
+        }
+        _ => HttpResponse::Ok().body("Not suitable search result"),
+    }
 }

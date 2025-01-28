@@ -38,6 +38,7 @@ pub async fn smart_scout_scraper_handler(
         4. Start scraping them
         */
         interval.tick().await;
+        return;
 
         // TODO: Stop condition
 
