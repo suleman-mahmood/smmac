@@ -93,6 +93,7 @@ pub async fn extract_data_from_google_search_with_reqwest(
                             return GoogleSearchResult::NotFound;
                         }
                         false => {
+                            log::info!("Got html response: {:?}", html_content);
                             log::error!("Blocked by captcha on query: {}", query.q);
                             retry_count += 1;
                         }
