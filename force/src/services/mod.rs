@@ -1,4 +1,5 @@
 pub mod data_persistance;
+pub mod domain_qualifier;
 pub mod domain_scraper;
 pub mod droid;
 pub mod email_verifier;
@@ -9,6 +10,7 @@ pub mod sentinel;
 pub mod smart_scout_scraper;
 
 pub use data_persistance::*;
+pub use domain_qualifier::*;
 pub use domain_scraper::*;
 pub use droid::*;
 pub use email_verifier::*;
