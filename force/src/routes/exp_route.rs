@@ -10,8 +10,8 @@ use crate::{
     domain::email::{FounderDomainEmail, Reachability, VerificationStatus},
     routes::lead_route::build_company_name_search_query,
     services::{
-        extract_data_from_google_search_with_reqwest, EmailVerifierSender, GoogleSearchResult,
-        GoogleSearchType, ProductQuerySender, Sentinel,
+        extract_data_from_google_search_with_reqwest, get_random_proxy, EmailVerifierSender,
+        GoogleSearchResult, GoogleSearchType, ProductQuerySender, Sentinel,
     },
 };
 
@@ -564,20 +564,25 @@ async fn verify_emails_smart_scout(
 
 #[get("/check-proxy-works")]
 async fn check_proxy_works() -> HttpResponse {
-    let query = build_company_name_search_query("AnkerDirect");
+    let proxy = get_random_proxy();
+    let http_proxy = reqwest::Proxy::http(proxy.clone()).unwrap();
+    let https_proxy = reqwest::Proxy::https(proxy.clone()).unwrap();
 
-    let google_search_result =
-        extract_data_from_google_search_with_reqwest(query.clone(), GoogleSearchType::CompanyName)
-            .await;
+    let client = reqwest::Client::builder()
+        .proxy(http_proxy)
+        .proxy(https_proxy)
+        .build()
+        .unwrap();
 
-    match google_search_result {
-        GoogleSearchResult::CompanyNames {
-            name_candidates,
-            page_source,
-        } => {
-            log::info!("Company name candidates: {:?}", name_candidates);
-            HttpResponse::Ok().body(page_source)
+    // http://google.com/search?q=amazon
+    // http://httpforever.com
+    // https://html.duckduckgo.com/html/?q=ankerdirect
+    match client.get("http://google.com/search?q=amazon").send().await {
+        Ok(res) => {
+            let html_content_result = res.text().await.unwrap();
+            log::info!("{:?}", html_content_result);
+            HttpResponse::Ok().body(html_content_result)
         }
-        _ => HttpResponse::Ok().body("Not suitable search result"),
+        Err(e) => HttpResponse::Ok().body(format!("{:?}", e)),
     }
 }
